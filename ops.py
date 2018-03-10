@@ -90,7 +90,7 @@ name层名称
 
 """
 def conv2d(input_, output_dim, 
-       k_h=5, k_w=5, d_h=2, d_w=2, stddev=0.02,
+       k_h=3, k_w=3, d_h=1, d_w=1, stddev=0.02,
        name="conv2d"):
   with tf.variable_scope(name):
     #初始化权重矩阵w
