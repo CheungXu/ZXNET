@@ -400,6 +400,17 @@ class DCGAN(object):
       第四层：h3，卷积核512个，输入图像大小bs*8*8*254，输出图像大小bs*4*4*512。
 
       """
+      h0 = lrelu(batch_normal(conv2d(image, self.df_dim, k_h=5, k_w=5, d_h=2, d_w=2, name='gl_d_h0_conv'),scope='gl_d_bn0', reuse=reuse)) #128*128*64
+      h1 = lrelu(batch_normal(conv2d(h0, self.df_dim*2, k_h=5, k_w=5, d_h=2, d_w=2, name='gl_d_h1_conv'),scope='gl_d_bn1', reuse=reuse)) #64*64*128
+      h2 = lrelu(batch_normal(conv2d(h1, self.df_dim*4, k_h=5, k_w=5, d_h=2, d_w=2, name='gl_d_h2_conv'),scope='gl_d_bn2', reuse=reuse)) #32*32*256
+      h3 = lrelu(batch_normal(conv2d(h2, self.df_dim*8, k_h=5, k_w=5, d_h=2, d_w=2, name='gl_d_h3_conv'),scope='gl_d_bn3', reuse=reuse)) #16*16*512
+      h4 = lrelu(batch_normal(conv2d(h3, self.df_dim*8, k_h=5, k_w=5, d_h=2, d_w=2, name='gl_d_h4_conv'),scope='gl_d_bn4', reuse=reuse)) #8*8*512
+      h5 = lrelu(batch_normal(conv2d(h4, self.df_dim*8, k_h=5, k_w=5, d_h=2, d_w=2, name='gl_d_h5_conv'),scope='gl_d_bn5', reuse=reuse)) #4*4*512
+      h6 = lrelu(batch_normal(linear(tf.reshape(h5, [self.batch_size, -1]), 1024, 'l_d_h6_lin'), scope='l_d_bn6', reuse=reuse))
+      h7 = linear(h6, 1, 'gl_d_lin9')
+      """
+
+      3.12
       h0 = lrelu(batch_normal(conv2d(image, self.df_dim, name='gl_d_h0_conv'),scope='gl_d_bn0', reuse=reuse)) #128*128*64
       h1 = lrelu(batch_normal(conv2d(h0, self.df_dim*2, d_h=2, d_w=2, name='gl_d_h1_conv'), scope='gl_d_bn1', reuse=reuse)) #64*64*128
       h2 = lrelu(batch_normal(conv2d(h1, self.df_dim*4, name='gl_d_h2_conv'), scope='gl_d_bn2', reuse=reuse)) #64*64*256
@@ -410,10 +421,14 @@ class DCGAN(object):
       h7 = lrelu(batch_normal(conv2d(h6, self.df_dim*8,  d_h = 2, d_w=2,name='gl_d_h7_conv'), scope='gl_d_bn7', reuse=reuse)) #8*8*128
       h8 = lrelu(batch_normal(linear(tf.reshape(h7, [self.batch_size, -1]), 1024, 'l_d_h8_lin'), scope='l_d_bn8', reuse=reuse))
       h9 = linear(h8, 1, 'gl_d_lin9')
+      """
+
+
+
       #h6 = lrelu(batch_normal(linear(tf.reshape(h5, [self.batch_size, -1]), 1024, 'gl_d_h6_lin'), scope='gl_d_bn6', reuse=reuse)) 
       #h7 = lrelu(batch_normal(linear(h6, 1, 'gl_d_h7_lin'), scope='gl_d_bn7', reuse=reuse))
       #返回结果
-      return h9#tf.reshape(h7, [self.batch_size, -1])
+      return h7 #tf.reshape(h7, [self.batch_size, -1])
 
   def local_discriminator(self, image, reuse=False):
     #判别器D，参数y为标签，reuse表示是否复用参数。
@@ -456,22 +471,19 @@ class DCGAN(object):
       第四层：h3，卷积核512个，输入图像大小bs*12*12*254，输出图像大小bs*6*6*512。
       第五层为线性分类层，输入大小[batch_size,18432]。
       """
-      h0 = lrelu(batch_normal(conv2d(image, self.df_dim, name='e_h0_conv',d_h = 1,d_w = 1), scope='e_bn0',reuse=reuse))
+      h0 = lrelu(batch_normal(conv2d(image, self.df_dim, name='e_h0_conv',k_h=5, k_w=5), scope='e_bn0',reuse=reuse))
       
-      h1 = lrelu(batch_normal(max_pool(conv2d(h0, self.df_dim*2, name='e_h1_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), name='e_h1_maxpool'), scope='e_bn1',reuse=reuse))
+      h1 = lrelu(batch_normal(conv2d(h0, self.df_dim*2, name='e_h1_conv', k_h=3, k_w=3, d_h = 2,d_w = 2), scope='e_bn1',reuse=reuse))
       h2 = lrelu(batch_normal(conv2d(h1, self.df_dim*2, name='e_h2_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='e_bn2',reuse=reuse))
 
-      h3 = lrelu(batch_normal(max_pool(conv2d(h2, self.df_dim*4, name='e_h3_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), name='e_h3_maxpool'), scope='e_bn3',reuse=reuse))     
-      #h4 = lrelu(batch_normal(conv2d(h3, self.df_dim*4, name='e_h4_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='e_bn4',reuse=reuse))
-      #h5 = lrelu(batch_normal(conv2d(h4, self.df_dim*4, name='e_h5_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='e_bn5',reuse=reuse))
+      h3 = lrelu(batch_normal(conv2d(h2, self.df_dim*4, name='e_h3_conv', k_h=3, k_w=3, d_h = 2,d_w = 2), scope='e_bn3',reuse=reuse))     
+      h4 = lrelu(batch_normal(conv2d(h3, self.df_dim*4, name='e_h4_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='e_bn4',reuse=reuse))
+      h5 = lrelu(batch_normal(conv2d(h4, self.df_dim*4, name='e_h5_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='e_bn5',reuse=reuse))
       
-      h6 = lrelu(batch_normal(dilated_conv(h3, self.df_dim*4, rate=2, name='e_h6_dilconv'), scope='e_bn6',reuse=reuse))
+      h6 = lrelu(batch_normal(dilated_conv(h5, self.df_dim*4, rate=2, name='e_h6_dilconv'), scope='e_bn6',reuse=reuse))
       h7 = lrelu(batch_normal(dilated_conv(h6, self.df_dim*4, rate=4, name='e_h7_dilconv'), scope='e_bn7',reuse=reuse))
       h8 = lrelu(batch_normal(dilated_conv(h7, self.df_dim*4, rate=8, name='e_h8_dilconv'), scope='e_bn8',reuse=reuse))
       h9 = lrelu(batch_normal(dilated_conv(h8, self.df_dim*4, rate=16, name='e_h9_dilconv'), scope='e_bn9',reuse=reuse))
-
-      #h10 = lrelu(batch_normal(conv2d(h9, self.df_dim*4, name='e_h10_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='e_bn10',reuse=reuse))
-      #h11 = lrelu(batch_normal(conv2d(h10, self.df_dim*4, name='e_h11_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='e_bn11',reuse=reuse))
       
       return h9
  
@@ -508,13 +520,13 @@ class DCGAN(object):
       
       self.keep_prob = tf.placeholder(tf.float32) 
 
-      h0 = lrelu(batch_normal(deconv2d(input_, [self.batch_size, s_h2, s_w2, self.gf_dim*4], k_h=5, k_w=5, name='g_h0_deconv'),scope='g_bn0',reuse=reuse))
+      h0 = lrelu(batch_normal(deconv2d(input_, [self.batch_size, s_h2, s_w2, self.gf_dim*4], k_h=4, k_w=4, name='g_h0_deconv'),scope='g_bn0',reuse=reuse))
       h1 = lrelu(batch_normal(conv2d(h0, self.df_dim*4, name='g_h1_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='g_bn1',reuse=reuse))
 
-      h2 = lrelu(batch_normal(deconv2d(h1, [self.batch_size, s_h, s_w, self.gf_dim*2], k_h=3, k_w=3, name='g_h2_deconv'),scope='g_bn2',reuse=reuse))
+      h2 = lrelu(batch_normal(deconv2d(h1, [self.batch_size, s_h, s_w, self.gf_dim*2], k_h=4, k_w=4, name='g_h2_deconv'),scope='g_bn2',reuse=reuse))
       h3 = lrelu(batch_normal(conv2d(h2, self.df_dim*2, name='g_h3_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='g_bn3',reuse=reuse))
       h4 = lrelu(batch_normal(conv2d(h3, self.df_dim, name='g_h4_comv' ,k_h = 3, k_w=3, d_h=1, d_w=1), scope='g_bn4', reuse=reuse))
-      h5 = conv2d(h4, 3, k_h=1, k_w=1, name='g_h5_comv')
+      h5 = conv2d(h4, 3, k_h=3, k_w=3, d_h=1, d_w=1, name='g_h5_comv')
       #h4 = lrelu(batch_normal(deconv2d(h3, [self.batch_size, s_h*2, s_w*2, self.gf_dim], k_h=3, k_w=3, name='g_h4_deconv'),scope='g_bn4',reuse=reuse))
 
       #h5 = max_pool(conv2d(h4, 3, name='g_h5_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), name='g_h5_maxpool')
