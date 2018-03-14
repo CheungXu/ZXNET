@@ -175,10 +175,12 @@ stddev 初始化参数的标准差
 bias_start 偏置项初始值
 with_w 返回值是否包含权重w和b
 """
-def linear(input_, output_size, scope=None, stddev=0.02, bias_start=0.0, with_w=False):
+def linear(input_, output_size, scope=None, stddev=0.02, bias_start=0.0, with_w=False, reuse=False):
   shape = input_.get_shape().as_list()
 
-  with tf.variable_scope(scope or "Linear"):
+  with tf.variable_scope(scope or "Linear") as scopes:
+    if reuse:
+      scopes.reuse_variables()
     matrix = tf.get_variable("Matrix", [shape[1], output_size], tf.float32,
                  tf.random_normal_initializer(stddev=stddev))
     bias = tf.get_variable("bias", [output_size],

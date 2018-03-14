@@ -87,8 +87,8 @@ class DCGAN(object):
     self.samples_names = glob(os.path.join("./data", self.sampleset_name, '*.png'))
     self.samples_mask = [os.path.join("./data", self.sampleset_name+'_'+self.mask_type, path.split('/')[3]) for path in self.samples_names]
     self.learn_rate_init = learning_rate_init
-    self.ep = tf.random_normal(shape=[self.batch_size, self.z_dim])
-    self.zp = tf.random_normal(shape=[self.batch_size, self.z_dim])
+    #self.ep = tf.random_normal(shape=[self.batch_size, self.z_dim])
+    #self.zp = tf.random_normal(shape=[self.batch_size, self.z_dim])
 
     #得到图像是否为灰度图
     self.grayscale = (self.c_dim == 1)
@@ -124,22 +124,24 @@ class DCGAN(object):
     #self.super_x_tilde, 
     self.x_tilde= self.generator(self.mask_z)
 
-    """
+
     self.local_x_tilde = self.x_tilde[:,32:96,18:82,:]
     self.local_inputs = self.inputs[:,32:96,18:82,:]
     self.local_width = 64
     self.local_height = 64
-    """
-    self.D_tilde = self.discriminator(self.x_tilde)
-    #self.d_tilde_h0,self.d_tilde_h1,self.d_tilde_h2,self.d_tilde_h3,self.d_tilde_h4,self.d_tilde_h5,self.D_tilde = self.discriminator(self.x_tilde)
-    #self.local_l_x_tilde,self.local_De_pro_tilde = self.local_discriminator(self.local_x_tilde)
-  
-    self.D_logits = self.discriminator(inputs, reuse=True)
-    #self.d_real_h0,self.d_real_h1,self.d_real_h2,self.d_real_h3,self.d_real_h4,self.d_real_h5,self.D_logits = self.discriminator(inputs, reuse=True)
-    #self.local_l_x, self.local_D_pro_logits = self.local_discriminator(self.local_inputs, reuse=True)
 
-    #self.D_logits = linear(tf.concat([self.D_pro_logits,self.local_D_pro_logits],0), 1, 'd_log_res_lin')
-    #self.D_tilde = linear(tf.concat([self.De_pro_tilde,self.local_De_pro_tilde],0), 1, 'd_til_res_lin')
+    self.De_pro_tilde = self.discriminator(self.x_tilde)
+    #self.d_tilde_h0,self.d_tilde_h1,self.d_tilde_h2,self.d_tilde_h3,self.d_tilde_h4,self.d_tilde_h5,self.D_tilde = self.discriminator(self.x_tilde)
+    #self.local_l_x_tilde,
+    self.local_De_pro_tilde = self.local_discriminator(self.local_x_tilde)
+  
+    self.D_pro_logits = self.discriminator(inputs, reuse=True)
+    #self.d_real_h0,self.d_real_h1,self.d_real_h2,self.d_real_h3,self.d_real_h4,self.d_real_h5,self.D_logits = self.discriminator(inputs, reuse=True)
+    #self.local_l_x, 
+    self.local_D_pro_logits = self.local_discriminator(self.local_inputs, reuse=True)
+
+    self.D_logits = linear(tf.concat([self.D_pro_logits,self.local_D_pro_logits],1), 1, 'd_log_res_lin')
+    self.D_tilde = linear(tf.concat([self.De_pro_tilde,self.local_De_pro_tilde], 1), 1, 'd_log_res_lin',reuse=True)
 
     #获取交叉熵损失函数
     def sigmoid_cross_entropy_with_logits(x, y):
@@ -161,7 +163,7 @@ class DCGAN(object):
     #特征损失
     self.z_loss = self.NLLNormal2(self.mask_z, self.inputs_z) / ((self.input_height / 4) * (self.input_width / 4) * 256) 
     self.LL_loss = self.NLLNormal2(self.x_tilde, self.inputs) / ((self.input_height) * (self.input_width) * 3)
-    #self.local_LL_loss = self.NLLNormal2(self.local_x_tilde, self.local_inputs) / ((self.local_height) * (self.local_width) * 3)
+    self.local_LL_loss = self.NLLNormal2(self.local_x_tilde, self.local_inputs) / ((self.local_height) * (self.local_width) * 3)
     """
     self.d_h0_loss = self.NLLNormal2(self.d_tilde_h0, self.d_real_h0) / ((self.input_height / 2) * (self.input_width / 2) * 64)
     self.d_h1_loss = self.NLLNormal2(self.d_tilde_h1, self.d_real_h1) / ((self.input_height / 4) * (self.input_width / 4) * 128)
@@ -172,7 +174,7 @@ class DCGAN(object):
     self.d_h_loss = self.d_h0_loss  + self.d_h1_loss  + self.d_h2_loss + self.d_h3_loss + self.d_h4_loss  + self.d_h5_loss 
     """
     #编码器损失
-    self.encode_loss = - self.z_loss - self.LL_loss #  - self.local_LL_loss 
+    self.encode_loss = - self.z_loss - self.LL_loss - self.local_LL_loss 
 
     #D的loss为真假loss之和                      
     self.D_loss = self.d_loss_real + self.d_loss_tilde #+ self.d_h_loss / 500 
@@ -188,8 +190,8 @@ class DCGAN(object):
     self.input_sum = image_summary('Inputs',self.inputs)
     self.G_sum = image_summary("G", self.x_tilde)
     #self.Su_G_sum = image_summary("S_G", self.super_x_tilde)
-    #self.local_input_sum = image_summary('Local_Input',self.local_inputs)
-    #self.local_G_sum = image_summary("Local_G", self.local_x_tilde)
+    self.local_input_sum = image_summary('Local_Input',self.local_inputs)
+    self.local_G_sum = image_summary("Local_G", self.local_x_tilde)
     #self.z_sum = histogram_summary("z", self.z_x)
 
     #记录损失函数
@@ -245,7 +247,7 @@ class DCGAN(object):
 
     #执行总结并记录入log中
     self.g_sum = merge_summary(
-        [self.input_sum, self.G_sum, self.d_loss_tilde_sum, self.g_loss_sum])
+        [self.input_sum, self.G_sum, self.d_loss_tilde_sum, self.local_input_sum, self.local_G_sum, self.g_loss_sum])
     self.d_sum = merge_summary(
         [self.d_loss_real_sum, self.d_loss_sum])
     self.e_sum = merge_summary(
@@ -339,15 +341,15 @@ class DCGAN(object):
           mask_images = np.array(mask_batch).astype(np.float32)
 
         # 更新生成器
-        _, summary_str = self.sess.run([opti_G,self.g_sum],feed_dict={self.inputs: batch_images,self.mask_inputs: mask_images,self.keep_prob: dropout_ratio})
+        _, summary_str = self.sess.run([opti_G,self.g_sum],feed_dict={self.inputs: batch_images,self.mask_inputs: mask_images})
         self.writer.add_summary(summary_str, epoch)
 
         # 更新编码器
-        _, summary_str = self.sess.run([opti_E,self.e_sum],feed_dict={self.inputs: batch_images,self.mask_inputs: mask_images,self.keep_prob: dropout_ratio})
+        _, summary_str = self.sess.run([opti_E,self.e_sum],feed_dict={self.inputs: batch_images,self.mask_inputs: mask_images})
         self.writer.add_summary(summary_str, epoch)
 
         # 更新判别器
-        _, summary_str = self.sess.run([opti_D,self.d_sum],feed_dict={self.inputs: batch_images,self.mask_inputs: mask_images,self.keep_prob: dropout_ratio})
+        _, summary_str = self.sess.run([opti_D,self.d_sum],feed_dict={self.inputs: batch_images,self.mask_inputs: mask_images})
         self.writer.add_summary(summary_str, epoch)
         
         # 更新学习率
@@ -357,7 +359,7 @@ class DCGAN(object):
           self.sess.run(add_global)  
         
         # 输出损失
-        D_loss, fake_loss, encode_loss, LL_loss, z_loss, new_learn_rate = self.sess.run([self.D_loss, self.G_loss, self.encode_loss,self.LL_loss, self.z_loss, new_learning_rate], feed_dict={self.inputs:batch_images,self.mask_inputs: mask_images,self.keep_prob: dropout_ratio})
+        D_loss, fake_loss, encode_loss, LL_loss, z_loss, new_learn_rate = self.sess.run([self.D_loss, self.G_loss, self.encode_loss,self.LL_loss, self.z_loss, new_learning_rate], feed_dict={self.inputs:batch_images,self.mask_inputs: mask_images})
         print("Epochs %d/%d Batch %d/%d: D: loss = %.7f G: loss=%.7f E: loss=%.7f LL loss=%.7f Z loss=%.7f, LR=%.7f" % (epoch, config.epoch, idx, batch_idxs,D_loss, fake_loss, encode_loss, LL_loss, z_loss, new_learn_rate))
       
       #更新droupout层激活率
@@ -369,7 +371,7 @@ class DCGAN(object):
       if np.mod(epoch, 1) == 0:
         sample_outputs= self.sess.run(
               self.x_tilde,
-              feed_dict={self.mask_inputs: sample_inputs,self.keep_prob: 1.0000})
+              feed_dict={self.mask_inputs: sample_inputs})
         save_images(sample_outputs, image_manifold_size(sample_outputs.shape[0]),
               './{}/train_output{:02d}_{:04d}.png'.format(config.sample_dir, epoch, idx))
         #save_images(super_sample_outputs, image_manifold_size(super_sample_outputs.shape[0]),
@@ -400,14 +402,15 @@ class DCGAN(object):
       第四层：h3，卷积核512个，输入图像大小bs*8*8*254，输出图像大小bs*4*4*512。
 
       """
-      h0 = lrelu(batch_normal(conv2d(image, self.df_dim, k_h=5, k_w=5, d_h=2, d_w=2, name='gl_d_h0_conv'),scope='gl_d_bn0', reuse=reuse)) #128*128*64
-      h1 = lrelu(batch_normal(conv2d(h0, self.df_dim*2, k_h=5, k_w=5, d_h=2, d_w=2, name='gl_d_h1_conv'),scope='gl_d_bn1', reuse=reuse)) #64*64*128
-      h2 = lrelu(batch_normal(conv2d(h1, self.df_dim*4, k_h=5, k_w=5, d_h=2, d_w=2, name='gl_d_h2_conv'),scope='gl_d_bn2', reuse=reuse)) #32*32*256
-      h3 = lrelu(batch_normal(conv2d(h2, self.df_dim*8, k_h=5, k_w=5, d_h=2, d_w=2, name='gl_d_h3_conv'),scope='gl_d_bn3', reuse=reuse)) #16*16*512
-      h4 = lrelu(batch_normal(conv2d(h3, self.df_dim*8, k_h=5, k_w=5, d_h=2, d_w=2, name='gl_d_h4_conv'),scope='gl_d_bn4', reuse=reuse)) #8*8*512
-      h5 = lrelu(batch_normal(conv2d(h4, self.df_dim*8, k_h=5, k_w=5, d_h=2, d_w=2, name='gl_d_h5_conv'),scope='gl_d_bn5', reuse=reuse)) #4*4*512
-      h6 = lrelu(batch_normal(linear(tf.reshape(h5, [self.batch_size, -1]), 1024, 'l_d_h6_lin'), scope='l_d_bn6', reuse=reuse))
-      h7 = linear(h6, 1, 'gl_d_lin9')
+
+      h0 = lrelu(batch_normal(conv2d(image, self.df_dim, k_h=5, k_w=5, d_h=2, d_w=2, name='gl_d_h0_conv'),scope='gl_d_bn0', reuse=reuse)) #64*64*64
+      h1 = lrelu(batch_normal(conv2d(h0, self.df_dim*2, k_h=5, k_w=5, d_h=2, d_w=2, name='gl_d_h1_conv'),scope='gl_d_bn1', reuse=reuse)) #32*32*128
+      h2 = lrelu(batch_normal(conv2d(h1, self.df_dim*4, k_h=5, k_w=5, d_h=2, d_w=2, name='gl_d_h2_conv'),scope='gl_d_bn2', reuse=reuse)) #16*16*256
+      h3 = lrelu(batch_normal(conv2d(h2, self.df_dim*8, k_h=5, k_w=5, d_h=2, d_w=2, name='gl_d_h3_conv'),scope='gl_d_bn3', reuse=reuse)) #8*8*512
+      h4 = lrelu(batch_normal(conv2d(h3, self.df_dim*8, k_h=5, k_w=5, d_h=2, d_w=2, name='gl_d_h4_conv'),scope='gl_d_bn4', reuse=reuse)) #4*4*512
+      #h5 = lrelu(batch_normal(conv2d(h4, self.df_dim*8, k_h=5, k_w=5, d_h=2, d_w=2, name='gl_d_h5_conv'),scope='gl_d_bn5', reuse=reuse)) #4*4*512
+      h6 = lrelu(batch_normal(linear(tf.reshape(h4, [self.batch_size, -1]), 1024, 'l_d_h6_lin'), scope='l_d_bn6', reuse=reuse))
+      #h7 = linear(h6, 1, 'gl_d_lin9')
       """
 
       3.12
@@ -428,7 +431,7 @@ class DCGAN(object):
       #h6 = lrelu(batch_normal(linear(tf.reshape(h5, [self.batch_size, -1]), 1024, 'gl_d_h6_lin'), scope='gl_d_bn6', reuse=reuse)) 
       #h7 = lrelu(batch_normal(linear(h6, 1, 'gl_d_h7_lin'), scope='gl_d_bn7', reuse=reuse))
       #返回结果
-      return h7 #tf.reshape(h7, [self.batch_size, -1])
+      return h6 #tf.reshape(h7, [self.batch_size, -1])
 
   def local_discriminator(self, image, reuse=False):
     #判别器D，参数y为标签，reuse表示是否复用参数。
@@ -446,17 +449,18 @@ class DCGAN(object):
       第二层：h1，卷积核128个，输入图像大小bs*16*16*64。
       第三层：h2，卷积核254个，输入图像大小bs*8*8*128, 输出图像大小bs*4*4*512
       """
-      h0 = lrelu(batch_normal(conv2d(image, self.df_dim, name='l_d_h0_conv'),scope='l_d_bn0',reuse=reuse))
-      h1 = lrelu(batch_normal(conv2d(h0, self.df_dim*2, d_h=1, d_w=1, name='l_d_h1_conv'), scope='l_d_bn1', reuse=reuse))
-      h2 = conv2d(h1, self.df_dim*4, name='l_d_h2_conv')
+      h0 = lrelu(batch_normal(conv2d(image, self.df_dim, name='l_d_h0_conv',k_h=5, k_w=5, d_h=2, d_w=2),scope='l_d_bn0',reuse=reuse)) #32*32*64
+      #h1 = lrelu(batch_normal(conv2d(h0, self.df_dim*2, k_h=5, k_w=2, d_h=1, d_w=1, name='l_d_h1_conv'), scope='l_d_bn1', reuse=reuse)) #32*32*128
+      h2 = conv2d(h0, self.df_dim*4, k_h=5, k_w=5, d_h=2, d_w=2,name='l_d_h2_conv') #16*16*256
       middle = h2
       h2 = lrelu(batch_normal(h2, scope='l_d_bn2', reuse=reuse))
 
-      h3 = lrelu(batch_normal(conv2d(h2, self.df_dim*8, name='l_d_h3_conv'), scope='l_d_bn3', reuse=reuse))
-      h4 = lrelu(batch_normal(conv2d(h3, self.df_dim*8, d_h=1, d_w=1, name='l_d_h4_conv'), scope='l_d_bn4', reuse=reuse))
+      h3 = lrelu(batch_normal(conv2d(h2, self.df_dim*8, k_h=5, k_w=5, d_h=2, d_w=2, name='l_d_h3_conv'), scope='l_d_bn3', reuse=reuse)) #8*8*512
+      h4 = lrelu(batch_normal(conv2d(h3, self.df_dim*8, k_h=5, k_w=5, d_h=2, d_w=2, name='l_d_h4_conv'), scope='l_d_bn4', reuse=reuse)) #4*4*512
+
       h5 = lrelu(batch_normal(linear(tf.reshape(h4, [self.batch_size, -1]), 1024, 'l_d_h5_lin'), scope='l_d_bn5', reuse=reuse))
       #返回结果
-      return middle, h5
+      return h5
 
   def encoder(self,image,reuse=False):
     with tf.variable_scope("encoder") as scope:
@@ -518,20 +522,18 @@ class DCGAN(object):
       """
       # project `z` and reshape
       
-      self.keep_prob = tf.placeholder(tf.float32) 
-
-      h0 = lrelu(batch_normal(deconv2d(input_, [self.batch_size, s_h2, s_w2, self.gf_dim*4], k_h=4, k_w=4, name='g_h0_deconv'),scope='g_bn0',reuse=reuse))
-      h1 = lrelu(batch_normal(conv2d(h0, self.df_dim*4, name='g_h1_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='g_bn1',reuse=reuse))
-
-      h2 = lrelu(batch_normal(deconv2d(h1, [self.batch_size, s_h, s_w, self.gf_dim*2], k_h=4, k_w=4, name='g_h2_deconv'),scope='g_bn2',reuse=reuse))
+      h0 = lrelu(batch_normal(conv2d(input_, self.df_dim*4, name='e_h0_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='e_bn0',reuse=reuse))
+      h1 = lrelu(batch_normal(conv2d(h0, self.df_dim*4, name='e_h1_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='e_bn1',reuse=reuse))
+      h2 = lrelu(batch_normal(deconv2d(h1, [self.batch_size, s_h2, s_w2, self.gf_dim*2], k_h=4, k_w=4, name='g_h2_deconv'),scope='g_bn2',reuse=reuse))
       h3 = lrelu(batch_normal(conv2d(h2, self.df_dim*2, name='g_h3_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='g_bn3',reuse=reuse))
-      h4 = lrelu(batch_normal(conv2d(h3, self.df_dim, name='g_h4_comv' ,k_h = 3, k_w=3, d_h=1, d_w=1), scope='g_bn4', reuse=reuse))
-      h5 = conv2d(h4, 3, k_h=3, k_w=3, d_h=1, d_w=1, name='g_h5_comv')
-      #h4 = lrelu(batch_normal(deconv2d(h3, [self.batch_size, s_h*2, s_w*2, self.gf_dim], k_h=3, k_w=3, name='g_h4_deconv'),scope='g_bn4',reuse=reuse))
+
+      h4 = lrelu(batch_normal(deconv2d(h3, [self.batch_size, s_h, s_w, self.gf_dim], k_h=4, k_w=4, name='g_h4_deconv'),scope='g_bn4',reuse=reuse))
+      h5 = lrelu(batch_normal(conv2d(h4, self.df_dim/2, name='g_h5_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='g_bn5',reuse=reuse))
+      h6 = conv2d(h5, 3, k_h=3, k_w=3, d_h=1, d_w=1, name='g_h6_comv')
 
       #h5 = max_pool(conv2d(h4, 3, name='g_h5_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), name='g_h5_maxpool')
 
-      return tf.nn.tanh(h5) #tf.nn.tanh(h4), tf.nn.tanh(h5)
+      return tf.nn.tanh(h6) #tf.nn.tanh(h4), tf.nn.tanh(h5)
 
   def KL_loss(self, mu, log_var):
       return -0.5 * tf.reduce_sum(1 + log_var - tf.pow(mu, 2) - tf.exp(log_var))
