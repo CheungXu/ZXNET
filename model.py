@@ -438,7 +438,7 @@ class DCGAN(object):
       h4 = lrelu(batch_normal(conv2d(h3, self.df_dim*8, d_h=1, d_w=1, name='l_d_h4_conv'), scope='l_d_bn4', reuse=reuse))
       h5 = lrelu(batch_normal(linear(tf.reshape(h4, [self.batch_size, -1]), 1024, 'l_d_h5_lin'), scope='l_d_bn5', reuse=reuse))
       #返回结果
-      return middle, h5
+      return h5
 
   def encoder(self,image,reuse=False):
     with tf.variable_scope("encoder") as scope:
