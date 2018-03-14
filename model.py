@@ -131,11 +131,13 @@ class DCGAN(object):
     self.local_height = 64
 
     self.De_pro_tilde = self.discriminator(self.x_tilde)
+    self.d_code_tilde = self.code_discriminator(self.mask_z)
     #self.d_tilde_h0,self.d_tilde_h1,self.d_tilde_h2,self.d_tilde_h3,self.d_tilde_h4,self.d_tilde_h5,self.D_tilde = self.discriminator(self.x_tilde)
     #self.local_l_x_tilde,
     self.local_De_pro_tilde = self.local_discriminator(self.local_x_tilde)
   
     self.D_pro_logits = self.discriminator(inputs, reuse=True)
+    self.d_code_logits = self.code_discriminator(self.inputs_z, reuse=True)
     #self.d_real_h0,self.d_real_h1,self.d_real_h2,self.d_real_h3,self.d_real_h4,self.d_real_h5,self.D_logits = self.discriminator(inputs, reuse=True)
     #self.local_l_x, 
     self.local_D_pro_logits = self.local_discriminator(self.local_inputs, reuse=True)
@@ -155,13 +157,14 @@ class DCGAN(object):
       sigmoid_cross_entropy_with_logits(self.D_logits, tf.ones_like(self.D_logits) - d_scale_factor))
     self.d_loss_tilde = tf.reduce_mean(
       sigmoid_cross_entropy_with_logits(self.D_tilde, tf.zeros_like(self.D_tilde) + d_scale_factor))
-
-
-    #KL loss
-    #self.kl_loss = self.KL_loss2(self.z_mean, self.z_sigm)
+    #CD的损失函数
+    self.cd_loss_real = tf.reduce_mean(
+      sigmoid_cross_entropy_with_logits(self.d_code_logits, tf.ones_like(self.d_code_logits) - d_scale_factor))
+    self.cd_loss_tilde = tf.reduce_mean(
+      sigmoid_cross_entropy_with_logits(self.d_code_tilde, tf.zeros_like(self.d_code_tilde) + d_scale_factor))
 
     #特征损失
-    self.z_loss = self.NLLNormal2(self.mask_z, self.inputs_z) / ((self.input_height / 4) * (self.input_width / 4) * 256) 
+    #self.z_loss = self.NLLNormal2(self.mask_z, self.inputs_z) / ((self.input_height / 4) * (self.input_width / 4) * 256) 
     self.LL_loss = self.NLLNormal2(self.x_tilde, self.inputs) / ((self.input_height) * (self.input_width) * 3)
     self.local_LL_loss = self.NLLNormal2(self.local_x_tilde, self.local_inputs) / ((self.local_height) * (self.local_width) * 3)
     """
@@ -174,11 +177,12 @@ class DCGAN(object):
     self.d_h_loss = self.d_h0_loss  + self.d_h1_loss  + self.d_h2_loss + self.d_h3_loss + self.d_h4_loss  + self.d_h5_loss 
     """
     #编码器损失
-    self.encode_loss = - self.z_loss - self.LL_loss - self.local_LL_loss 
+    self.z_loss_tilde = tf.reduce_mean(sigmoid_cross_entropy_with_logits(self.d_code_tild, tf.ones_like(self.d_code_tilde) - g_scale_factor))
+    self.encode_loss = z_loss_tilde - self.LL_loss - self.local_LL_loss 
 
     #D的loss为真假loss之和                      
     self.D_loss = self.d_loss_real + self.d_loss_tilde #+ self.d_h_loss / 500 
-
+    self.CD_loss = self.cd_loss_real + self.cd_loss_tilde
     #G的损失函数
     self.G_loss_tilde = tf.reduce_mean(sigmoid_cross_entropy_with_logits(self.D_tilde, tf.ones_like(self.D_tilde) - g_scale_factor))
     self.G_loss = self.G_loss_tilde - self.LL_loss #- self.d_h_loss / 500
@@ -202,13 +206,16 @@ class DCGAN(object):
     #self.local_ll_loss_sum = scalar_summary("local_ll_loss", -self.local_LL_loss)
     self.d_loss_real_sum = scalar_summary("d_loss_real", self.d_loss_real)
     self.d_loss_tilde_sum = scalar_summary("d_loss_tilde", self.d_loss_tilde)
+    self.cd_loss_real_sum = scalar_summary("cd_loss_real", self.cd_loss_real)
+    self.cd_loss_tilde_sum = scalar_summary("cd_loss_tilde", self.cd_loss_tilde)
     self.e_loss_sum = scalar_summary("e_loss", self.encode_loss)
+    self.cd_loss_sum = scalar_summary("cd_loss", self.CD_loss)
     self.g_loss_sum = scalar_summary("g_loss", self.G_loss)
     self.d_loss_sum = scalar_summary("d_loss", self.D_loss)
 
 
     t_vars = tf.trainable_variables()
-
+    self.cd_cars = [var for var in t_vars if 'dc_' in var.name]
     self.d_vars = [var for var in t_vars if 'd_' in var.name]
     self.g_vars = [var for var in t_vars if 'g_' in var.name]
     self.e_vars = [var for var in t_vars if 'e_' in var.name]
@@ -226,6 +233,11 @@ class DCGAN(object):
     trainer_D = tf.train.RMSPropOptimizer(learning_rate=new_learning_rate)
     gradients_D = trainer_D.compute_gradients(self.D_loss, var_list=self.d_vars)
     opti_D = trainer_D.apply_gradients(gradients_D)
+
+    #CD优化器
+    trainer_CD = tf.train.RMSPropOptimizer(learning_rate=new_learning_rate)
+    gradients_CD = trainer_CD.compute_gradients(self.CD_loss, var_list=self.cd_vars)
+    opti_CD = trainer_CD.apply_gradients(gradients_CD)
 
     #G优化器
     #opti_G = tf.train.AdamOptimizer(new_learning_rate, beta1=config.beta1).minimize(self.G_loss, var_list=self.g_vars)
@@ -252,6 +264,8 @@ class DCGAN(object):
         [self.d_loss_real_sum, self.d_loss_sum])
     self.e_sum = merge_summary(
         [self.ll_loss_sum, self.z_loss_sum, self.e_loss_sum])
+    self.cd_sum = merge_summary(
+        [self.cd_loss_real_sum, self.cd_loss_tilde_sum, self.cd_loss_sum])
     self.writer = SummaryWriter("./logs", self.sess.graph)
     
     #开始训练
@@ -340,12 +354,16 @@ class DCGAN(object):
           batch_images = np.array(batch).astype(np.float32)
           mask_images = np.array(mask_batch).astype(np.float32)
 
-        # 更新生成器
-        _, summary_str = self.sess.run([opti_G,self.g_sum],feed_dict={self.inputs: batch_images,self.mask_inputs: mask_images})
-        self.writer.add_summary(summary_str, epoch)
-
         # 更新编码器
         _, summary_str = self.sess.run([opti_E,self.e_sum],feed_dict={self.inputs: batch_images,self.mask_inputs: mask_images})
+        self.writer.add_summary(summary_str, epoch)
+
+        # 更新判别器
+        _, summary_str = self.sess.run([opti_CD,self.cd_sum],feed_dict={self.inputs: batch_images,self.mask_inputs: mask_images})
+        self.writer.add_summary(summary_str, epoch)
+
+        # 更新生成器
+        _, summary_str = self.sess.run([opti_G,self.g_sum],feed_dict={self.inputs: batch_images,self.mask_inputs: mask_images})
         self.writer.add_summary(summary_str, epoch)
 
         # 更新判别器
@@ -359,8 +377,8 @@ class DCGAN(object):
           self.sess.run(add_global)  
         
         # 输出损失
-        D_loss, fake_loss, encode_loss, LL_loss, z_loss, new_learn_rate = self.sess.run([self.D_loss, self.G_loss, self.encode_loss,self.LL_loss, self.z_loss, new_learning_rate], feed_dict={self.inputs:batch_images,self.mask_inputs: mask_images})
-        print("Epochs %d/%d Batch %d/%d: D: loss = %.7f G: loss=%.7f E: loss=%.7f LL loss=%.7f Z loss=%.7f, LR=%.7f" % (epoch, config.epoch, idx, batch_idxs,D_loss, fake_loss, encode_loss, LL_loss, z_loss, new_learn_rate))
+        D_loss, fake_loss, encode_loss, LL_loss, cd_loss, new_learn_rate = self.sess.run([self.D_loss, self.G_loss, self.encode_loss,self.LL_loss, self.CD_loss, new_learning_rate], feed_dict={self.inputs:batch_images,self.mask_inputs: mask_images})
+        print("Epochs %d/%d Batch %d/%d: D: loss = %.7f G: loss=%.7f E: loss=%.7f LL loss=%.7f CD loss=%.7f, LR=%.7f" % (epoch, config.epoch, idx, batch_idxs,D_loss, fake_loss, encode_loss, LL_loss, CD_loss, new_learn_rate))
       
       #更新droupout层激活率
       #dropout_ratio += 0.1000
@@ -439,7 +457,6 @@ class DCGAN(object):
       if reuse:
         scope.reuse_variables()
 
-      #根据是否存在标签，建立相应的网络
       #df_dim为第一层卷积层纬度（卷积核个数），默认64.
       #函数conv2d/lrelu/linear见ops.py模块
       """
@@ -462,6 +479,32 @@ class DCGAN(object):
       #返回结果
       return h5
 
+  def code_discriminator(self, code, reuse=False):
+    with tf.variable_scope("code_discriminator") as scope:
+      if reuse:
+        scope.reuse_variables() 
+
+      #df_dim为第一层卷积层纬度（卷积核个数），默认64.
+      #函数conv2d/lrelu/linear见ops.py模块
+      """
+      网络结构：（图像大小以输入32×32×3为例）
+      卷积核大小默认5*5，步长2，bs为batch_size。
+      第一层：h0，卷积核64个，输入图像大小bs*32*32*3。
+      第二层：h1，卷积核128个，输入图像大小bs*16*16*64。
+      第三层：h2，卷积核254个，输入图像大小bs*8*8*128, 输出图像大小bs*4*4*512
+      """
+      h0 = lrelu(batch_normal(conv2d(image, self.df_dim*2, name='dc_h0_conv',k_h=5, k_w=5, d_h=2, d_w=2),scope='dc_bn0',reuse=reuse)) #16*16*128
+      h1 = lrelu(batch_normal(conv2d(h0, self.df_dim*4, k_h=3, k_w=3, d_h=2, d_w=2,name='dc_h1_conv'), scope='dc_bn1', reuse=reuse)) #8*8*256
+      h2 = lrelu(batch_normal(conv2d(h2, self.df_dim*8, k_h=3, k_w=3, d_h=2, d_w=2, name='dc_h2_conv'), scope='dc_bn2', reuse=reuse)) #4*4*512
+      h3 = lrelu(batch_normal(conv2d(h3, self.df_dim*8, k_h=4, k_w=4, d_h=1, d_w=1, name='dc_h3_conv'), scope='dc_bn3', reuse=reuse)) #1*1*512
+
+      h4 = lrelu(batch_normal(linear(tf.reshape(h4, [self.batch_size, -1]), 1, 'dc_h4_lin'), scope='dc_bn4', reuse=reuse))
+      #返回结果
+      return h4
+
+
+
+
   def encoder(self,image,reuse=False):
     with tf.variable_scope("encoder") as scope:
       if reuse:
@@ -482,14 +525,14 @@ class DCGAN(object):
 
       h3 = lrelu(batch_normal(conv2d(h2, self.df_dim*4, name='e_h3_conv', k_h=3, k_w=3, d_h = 2,d_w = 2), scope='e_bn3',reuse=reuse))     
       h4 = lrelu(batch_normal(conv2d(h3, self.df_dim*4, name='e_h4_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='e_bn4',reuse=reuse))
-      h5 = lrelu(batch_normal(conv2d(h4, self.df_dim*4, name='e_h5_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='e_bn5',reuse=reuse))
+      #h5 = lrelu(batch_normal(conv2d(h4, self.df_dim*4, name='e_h5_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='e_bn5',reuse=reuse))
       
-      h6 = lrelu(batch_normal(dilated_conv(h5, self.df_dim*4, rate=2, name='e_h6_dilconv'), scope='e_bn6',reuse=reuse))
+      h6 = lrelu(batch_normal(dilated_conv(h4, self.df_dim*4, rate=2, name='e_h6_dilconv'), scope='e_bn6',reuse=reuse))
       h7 = lrelu(batch_normal(dilated_conv(h6, self.df_dim*4, rate=4, name='e_h7_dilconv'), scope='e_bn7',reuse=reuse))
-      h8 = lrelu(batch_normal(dilated_conv(h7, self.df_dim*4, rate=8, name='e_h8_dilconv'), scope='e_bn8',reuse=reuse))
-      h9 = lrelu(batch_normal(dilated_conv(h8, self.df_dim*4, rate=16, name='e_h9_dilconv'), scope='e_bn9',reuse=reuse))
+      #h8 = lrelu(batch_normal(dilated_conv(h7, self.df_dim*4, rate=8, name='e_h8_dilconv'), scope='e_bn8',reuse=reuse))
+      #h9 = lrelu(batch_normal(dilated_conv(h8, self.df_dim*4, rate=16, name='e_h9_dilconv'), scope='e_bn9',reuse=reuse))
       
-      return h9
+      return h7
  
   def generator(self, input_, reuse=False):
     #生成器G，参数z为属于噪声，y为标签。
