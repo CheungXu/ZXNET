@@ -177,7 +177,7 @@ class DCGAN(object):
     self.d_h_loss = self.d_h0_loss  + self.d_h1_loss  + self.d_h2_loss + self.d_h3_loss + self.d_h4_loss  + self.d_h5_loss 
     """
     #编码器损失
-    self.z_loss_tilde = tf.reduce_mean(sigmoid_cross_entropy_with_logits(self.d_code_tild, tf.ones_like(self.d_code_tilde) - g_scale_factor))
+    self.z_loss_tilde = tf.reduce_mean(sigmoid_cross_entropy_with_logits(self.d_code_tilde, tf.ones_like(self.d_code_tilde) - g_scale_factor))
     self.encode_loss = z_loss_tilde - self.LL_loss - self.local_LL_loss 
 
     #D的loss为真假loss之和                      
