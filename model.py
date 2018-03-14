@@ -178,7 +178,7 @@ class DCGAN(object):
     """
     #编码器损失
     self.z_loss_tilde = tf.reduce_mean(sigmoid_cross_entropy_with_logits(self.d_code_tilde, tf.ones_like(self.d_code_tilde) - g_scale_factor))
-    self.encode_loss = z_loss_tilde - self.LL_loss - self.local_LL_loss 
+    self.encode_loss = self.z_loss_tilde - self.LL_loss - self.local_LL_loss 
 
     #D的loss为真假loss之和                      
     self.D_loss = self.d_loss_real + self.d_loss_tilde #+ self.d_h_loss / 500 
@@ -200,7 +200,7 @@ class DCGAN(object):
 
     #记录损失函数
     #self.kl_loss_sum = scalar_summary("kl_loss", self.kl_loss)
-    self.z_loss_sum = scalar_summary("z_loss", -self.z_loss)
+    self.z_loss_sum = scalar_summary("z_loss", self.z_loss_tilde)
     #self.d_h_loss_sum = scalar_summary("z_loss", -self.d_h_loss)
     self.ll_loss_sum = scalar_summary("ll_loss", -self.LL_loss)
     #self.local_ll_loss_sum = scalar_summary("local_ll_loss", -self.local_LL_loss)
@@ -215,7 +215,7 @@ class DCGAN(object):
 
 
     t_vars = tf.trainable_variables()
-    self.cd_cars = [var for var in t_vars if 'dc_' in var.name]
+    self.cd_vars = [var for var in t_vars if 'dc_' in var.name]
     self.d_vars = [var for var in t_vars if 'd_' in var.name]
     self.g_vars = [var for var in t_vars if 'g_' in var.name]
     self.e_vars = [var for var in t_vars if 'e_' in var.name]
@@ -378,7 +378,7 @@ class DCGAN(object):
         
         # 输出损失
         D_loss, fake_loss, encode_loss, LL_loss, cd_loss, new_learn_rate = self.sess.run([self.D_loss, self.G_loss, self.encode_loss,self.LL_loss, self.CD_loss, new_learning_rate], feed_dict={self.inputs:batch_images,self.mask_inputs: mask_images})
-        print("Epochs %d/%d Batch %d/%d: D: loss = %.7f G: loss=%.7f E: loss=%.7f LL loss=%.7f CD loss=%.7f, LR=%.7f" % (epoch, config.epoch, idx, batch_idxs,D_loss, fake_loss, encode_loss, LL_loss, CD_loss, new_learn_rate))
+        print("Epochs %d/%d Batch %d/%d: D: loss = %.7f G: loss=%.7f E: loss=%.7f LL loss=%.7f CD loss=%.7f, LR=%.7f" % (epoch, config.epoch, idx, batch_idxs,D_loss, fake_loss, encode_loss, LL_loss, cd_loss, new_learn_rate))
       
       #更新droupout层激活率
       #dropout_ratio += 0.1000
