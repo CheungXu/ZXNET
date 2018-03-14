@@ -495,10 +495,10 @@ class DCGAN(object):
       """
       h0 = lrelu(batch_normal(conv2d(code, self.df_dim*2, name='dc_h0_conv',k_h=5, k_w=5, d_h=2, d_w=2),scope='dc_bn0',reuse=reuse)) #16*16*128
       h1 = lrelu(batch_normal(conv2d(h0, self.df_dim*4, k_h=3, k_w=3, d_h=2, d_w=2,name='dc_h1_conv'), scope='dc_bn1', reuse=reuse)) #8*8*256
-      h2 = lrelu(batch_normal(conv2d(h2, self.df_dim*8, k_h=3, k_w=3, d_h=2, d_w=2, name='dc_h2_conv'), scope='dc_bn2', reuse=reuse)) #4*4*512
-      h3 = lrelu(batch_normal(conv2d(h3, self.df_dim*8, k_h=4, k_w=4, d_h=1, d_w=1, name='dc_h3_conv'), scope='dc_bn3', reuse=reuse)) #1*1*512
+      h2 = lrelu(batch_normal(conv2d(h1, self.df_dim*8, k_h=3, k_w=3, d_h=2, d_w=2, name='dc_h2_conv'), scope='dc_bn2', reuse=reuse)) #4*4*512
+      h3 = lrelu(batch_normal(conv2d(h2, self.df_dim*8, k_h=4, k_w=4, d_h=1, d_w=1, name='dc_h3_conv'), scope='dc_bn3', reuse=reuse)) #1*1*512
 
-      h4 = lrelu(batch_normal(linear(tf.reshape(h4, [self.batch_size, -1]), 1, 'dc_h4_lin'), scope='dc_bn4', reuse=reuse))
+      h4 = lrelu(batch_normal(linear(tf.reshape(h3, [self.batch_size, -1]), 1, 'dc_h4_lin'), scope='dc_bn4', reuse=reuse))
       #返回结果
       return h4
 
