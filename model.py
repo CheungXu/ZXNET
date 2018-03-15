@@ -358,23 +358,31 @@ class DCGAN(object):
         _, summary_str = self.sess.run([opti_E,self.e_sum],feed_dict={self.inputs: batch_images,self.mask_inputs: mask_images})
         self.writer.add_summary(summary_str, epoch)
 
-        # 更新判别器
-        _, summary_str = self.sess.run([opti_CD,self.cd_sum],feed_dict={self.inputs: batch_images,self.mask_inputs: mask_images})
-        self.writer.add_summary(summary_str, epoch)
-
         # 更新生成器
         _, summary_str = self.sess.run([opti_G,self.g_sum],feed_dict={self.inputs: batch_images,self.mask_inputs: mask_images})
         self.writer.add_summary(summary_str, epoch)
 
         # 更新判别器
-        _, summary_str = self.sess.run([opti_D,self.d_sum],feed_dict={self.inputs: batch_images,self.mask_inputs: mask_images})
+        _, summary_str, x_tilde= self.sess.run([opti_CD,self.cd_sum, self.x_tilde],feed_dict={self.inputs: batch_images,self.mask_inputs: mask_images})
+        self.writer.add_summary(summary_str, epoch)
+
+        # 更新编码器
+        _, summary_str = self.sess.run([opti_E,self.e_sum],feed_dict={self.inputs: batch_images,self.mask_inputs: x_tilde})
+        self.writer.add_summary(summary_str, epoch)
+
+        # 更新生成器
+        _, summary_str = self.sess.run([opti_G,self.g_sum],feed_dict={self.inputs: batch_images,self.mask_inputs: x_tilde})
+        self.writer.add_summary(summary_str, epoch)
+
+        # 更新判别器
+        _, summary_str = self.sess.run([opti_D,self.d_sum],feed_dict={self.inputs: batch_images,self.mask_inputs: x_tilde})
         self.writer.add_summary(summary_str, epoch)
         
         # 更新学习率
-        new_learn_rate = self.sess.run(new_learning_rate)
+        #new_learn_rate = self.sess.run(new_learning_rate)
         
-        if new_learn_rate > 0.00005:
-          self.sess.run(add_global)  
+        #if new_learn_rate > 0.00005:
+         # self.sess.run(add_global)  
         
         # 输出损失
         D_loss, fake_loss, encode_loss, LL_loss, cd_loss, new_learn_rate = self.sess.run([self.D_loss, self.G_loss, self.encode_loss,self.LL_loss, self.CD_loss, new_learning_rate], feed_dict={self.inputs:batch_images,self.mask_inputs: mask_images})
