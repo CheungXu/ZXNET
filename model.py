@@ -565,8 +565,8 @@ class DCGAN(object):
       """
       # project `z` and reshape
       
-      h0 = lrelu(batch_normal(conv2d(input_, self.df_dim*4, name='e_h0_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='e_bn0',reuse=reuse))
-      h1 = lrelu(batch_normal(conv2d(h0, self.df_dim*4, name='e_h1_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='e_bn1',reuse=reuse))
+      h0 = lrelu(batch_normal(conv2d(input_, self.df_dim*4, name='g_h0_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='g_bn0',reuse=reuse))
+      h1 = lrelu(batch_normal(conv2d(h0, self.df_dim*4, name='g_h1_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='g_bn1',reuse=reuse))
       h2 = lrelu(batch_normal(deconv2d(h1, [self.batch_size, s_h2, s_w2, self.gf_dim*2], k_h=4, k_w=4, name='g_h2_deconv'),scope='g_bn2',reuse=reuse))
       h3 = lrelu(batch_normal(conv2d(h2, self.df_dim*2, name='g_h3_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='g_bn3',reuse=reuse))
 
