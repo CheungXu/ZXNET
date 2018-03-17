@@ -119,10 +119,10 @@ class DCGAN(object):
     #按照相应的方法建立网络。
     #self.z_mean,self.z_sigm = self.encoder(mask_inputs)
     #self.z_x = tf.add(self.z_mean, tf.sqrt(tf.exp(self.z_sigm))*self.ep)
-    self.mask_z = self.encoder(mask_inputs)
-    self.inputs_z = self.encoder(inputs, reuse=True)
+    self.mask_z_4, self.mask_z_2, self.mask_z = self.encoder(mask_inputs)
+    _,_,self.inputs_z = self.encoder(inputs, reuse=True)
     #self.super_x_tilde, 
-    self.x_tilde= self.generator(self.mask_z)
+    self.x_tilde= self.generator(self.mask_z, self.mask_z_2, self.mask_z_4)
 
 
     self.local_x_tilde = self.x_tilde[:,32:96,18:82,:]
@@ -278,46 +278,53 @@ class DCGAN(object):
       print(" [*] Load SUCCESS")
     else:
       print(" [!] Load failed...")
-    #载入sample数据
-    sample_files = self.mask_data[0:self.sample_num]
-    sample_real_files = self.data[0:self.sample_num]
-    samples = [
-        get_image(sample_file,
-                  input_height=self.input_height,
-                  input_width=self.input_width,
-                  resize_height=self.output_height,
-                  resize_width=self.output_width,
-                  crop=self.crop,
-                  grayscale=self.grayscale) for sample_file in sample_files]
-    sample_real = [
-        get_image(sample_file,
-                  input_height=self.input_height,
-                  input_width=self.input_width,
-                  resize_height=self.output_height,
-                  resize_width=self.output_width,
-                  crop=self.crop,
-                  grayscale=self.grayscale) for sample_file in sample_real_files]
-    #合并通道
-    mask_img = get_image(os.path.join("./data",self.dataset_name+'_'+self.mask_type,'mask.'+self.input_fname_pattern.split('.')[1]),
-                         input_height=self.input_height,input_width=self.input_width,resize_height=self.input_height,resize_width=self.input_width,grayscale=True)
-    new_mask = mask_img[:,:,np.newaxis]
-    sample = samples #[np.concatenate([im,new_mask],axis=2) for im in samples]
 
-    #转换数据类型
-    if (self.grayscale):
-      sample_real_save = np.array(sample_real).astype(np.float32)[:, :, :, None]
-      sample_inputs = np.array(sample).astype(np.float32)[:, :, :, None]
-      sample_inputs_save = np.array(samples).astype(np.float32)[:, :, :, None]
-    else:
-      sample_inputs = np.array(sample).astype(np.float32)
-      sample_real_save = np.array(sample_real).astype(np.float32)
-      sample_inputs_save = np.array(samples).astype(np.float32)
+    samples_dataet = []
+    for i in range(4):
+      if not os.path.exists('./{}/{}/'.format(config.sample_dir, str(i))):
+        os.makedirs('./{}/{}/'.format(config.sample_dir, str(i)))
+      #载入sample数据
+      sample_files = self.mask_data[0:self.sample_num]
+      sample_real_files = self.data[0:self.sample_num]
+      samples = [
+          get_image(sample_file,
+                    input_height=self.input_height,
+                    input_width=self.input_width,
+                    resize_height=self.output_height,
+                    resize_width=self.output_width,
+                    crop=self.crop,
+                    grayscale=self.grayscale) for sample_file in sample_files]
+      sample_real = [
+          get_image(sample_file,
+                    input_height=self.input_height,
+                    input_width=self.input_width,
+                    resize_height=self.output_height,
+                    resize_width=self.output_width,
+                    crop=self.crop,
+                    grayscale=self.grayscale) for sample_file in sample_real_files]
+      #合并通道
+      mask_img = get_image(os.path.join("./data",self.dataset_name+'_'+self.mask_type,'mask.'+self.input_fname_pattern.split('.')[1]),
+                           input_height=self.input_height,input_width=self.input_width,resize_height=self.input_height,resize_width=self.input_width,grayscale=True)
+      new_mask = mask_img[:,:,np.newaxis]
+      sample = samples #[np.concatenate([im,new_mask],axis=2) for im in samples]
+
+      #转换数据类型
+      if (self.grayscale):
+        sample_real_save = np.array(sample_real).astype(np.float32)[:, :, :, None]
+        sample_inputs = np.array(sample).astype(np.float32)[:, :, :, None]
+        sample_inputs_save = np.array(samples).astype(np.float32)[:, :, :, None]
+      else:
+        sample_inputs = np.array(sample).astype(np.float32)
+        sample_real_save = np.array(sample_real).astype(np.float32)
+        sample_inputs_save = np.array(samples).astype(np.float32)
+      samples_dataet.append(sample_inputs)
+      #保存测试图像
+      save_images(sample_inputs_save, image_manifold_size(sample_inputs_save.shape[0]),
+            './{}/{}/train_input.png'.format(config.sample_dir, str(i)))
+      save_images(sample_real_save, image_manifold_size(sample_real_save.shape[0]),
+            './{}/{}/train_real.png'.format(config.sample_dir, str(i)))
+
     dropout_ratio = 1.0000#0.5000
-    #保存测试图像
-    save_images(sample_inputs_save, image_manifold_size(sample_inputs_save.shape[0]),
-          './{}/train_input.png'.format(config.sample_dir))
-    save_images(sample_real_save, image_manifold_size(sample_real_save.shape[0]),
-          './{}/train_real.png'.format(config.sample_dir))
     #开始迭代
     self.sess.graph.finalize() 
     for epoch in xrange(counter,config.epoch):
@@ -363,20 +370,20 @@ class DCGAN(object):
         self.writer.add_summary(summary_str, epoch)
 
         # 更新判别器
-        _, summary_str, x_tilde= self.sess.run([opti_CD,self.cd_sum, self.x_tilde],feed_dict={self.inputs: batch_images,self.mask_inputs: mask_images})
+        _, summary_str = self.sess.run([opti_CD,self.cd_sum],feed_dict={self.inputs: batch_images,self.mask_inputs: mask_images})
         self.writer.add_summary(summary_str, epoch)
 
         # 更新编码器
-        _, summary_str = self.sess.run([opti_E,self.e_sum],feed_dict={self.inputs: batch_images,self.mask_inputs: x_tilde})
-        self.writer.add_summary(summary_str, epoch)
+        #_, summary_str = self.sess.run([opti_E,self.e_sum],feed_dict={self.inputs: batch_images,self.mask_inputs: x_tilde})
+        #self.writer.add_summary(summary_str, epoch)
 
         # 更新生成器
-        _, summary_str = self.sess.run([opti_G,self.g_sum],feed_dict={self.inputs: batch_images,self.mask_inputs: x_tilde})
-        self.writer.add_summary(summary_str, epoch)
+        #_, summary_str = self.sess.run([opti_G,self.g_sum],feed_dict={self.inputs: batch_images,self.mask_inputs: x_tilde})
+        #self.writer.add_summary(summary_str, epoch)
 
         # 更新判别器
-        _, summary_str = self.sess.run([opti_D,self.d_sum],feed_dict={self.inputs: batch_images,self.mask_inputs: x_tilde})
-        self.writer.add_summary(summary_str, epoch)
+        #_, summary_str = self.sess.run([opti_D,self.d_sum],feed_dict={self.inputs: batch_images,self.mask_inputs: x_tilde})
+        #self.writer.add_summary(summary_str, epoch)
         
         # 更新学习率
         #new_learn_rate = self.sess.run(new_learning_rate)
@@ -395,13 +402,12 @@ class DCGAN(object):
        # dropout_ratio = 0.8000
       # 保存图像
       if np.mod(epoch, 1) == 0:
-        sample_outputs= self.sess.run(
-              self.x_tilde,
-              feed_dict={self.mask_inputs: sample_inputs})
-        save_images(sample_outputs, image_manifold_size(sample_outputs.shape[0]),
-              './{}/train_output{:02d}_{:04d}.png'.format(config.sample_dir, epoch, idx))
-        #save_images(super_sample_outputs, image_manifold_size(super_sample_outputs.shape[0]),
-         #     './{}/train_output{:02d}_{:04d}_super.png'.format(config.sample_dir, epoch, idx))
+        for i in range(len(samples_dataet)):
+          sample_outputs= self.sess.run(
+                self.x_tilde,
+                feed_dict={self.mask_inputs: samples_dataet[i]})
+          save_images(sample_outputs, image_manifold_size(sample_outputs.shape[0]),
+                './{}/{}/train_output{:02d}_{:04d}.png'.format(config.sample_dir, str(i), epoch, idx))
         print("[Sample] : %s" % ('./{}/train_{:02d}_{:04d}.png'.format(config.sample_dir, epoch, idx)))
         #print("[Sample] d_loss: %.8f, g_loss: %.8f, e_loss: %.8f" % (d_loss, g_loss,e_loss)) 
       # 保存模型
@@ -510,9 +516,6 @@ class DCGAN(object):
       #返回结果
       return h4
 
-
-
-
   def encoder(self,image,reuse=False):
     with tf.variable_scope("encoder") as scope:
       if reuse:
@@ -532,17 +535,17 @@ class DCGAN(object):
       h2 = lrelu(batch_normal(conv2d(h1, self.df_dim*2, name='e_h2_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='e_bn2',reuse=reuse))
 
       h3 = lrelu(batch_normal(conv2d(h2, self.df_dim*4, name='e_h3_conv', k_h=3, k_w=3, d_h = 2,d_w = 2), scope='e_bn3',reuse=reuse))     
-      h4 = lrelu(batch_normal(conv2d(h3, self.df_dim*4, name='e_h4_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='e_bn4',reuse=reuse))
+      #h4 = lrelu(batch_normal(conv2d(h3, self.df_dim*4, name='e_h4_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='e_bn4',reuse=reuse))
       #h5 = lrelu(batch_normal(conv2d(h4, self.df_dim*4, name='e_h5_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='e_bn5',reuse=reuse))
       
-      h6 = lrelu(batch_normal(dilated_conv(h4, self.df_dim*4, rate=2, name='e_h6_dilconv'), scope='e_bn6',reuse=reuse))
+      h6 = lrelu(batch_normal(dilated_conv(h3, self.df_dim*4, rate=2, name='e_h6_dilconv'), scope='e_bn6',reuse=reuse))
       h7 = lrelu(batch_normal(dilated_conv(h6, self.df_dim*4, rate=4, name='e_h7_dilconv'), scope='e_bn7',reuse=reuse))
       #h8 = lrelu(batch_normal(dilated_conv(h7, self.df_dim*4, rate=8, name='e_h8_dilconv'), scope='e_bn8',reuse=reuse))
       #h9 = lrelu(batch_normal(dilated_conv(h8, self.df_dim*4, rate=16, name='e_h9_dilconv'), scope='e_bn9',reuse=reuse))
       
-      return h7
+      return h0,h2,h7
  
-  def generator(self, input_, reuse=False):
+  def generator(self, input_, input_2, input_4, reuse=False):
     #生成器G，参数z为属于噪声，y为标签。
     with tf.variable_scope("generator") as scope:
       if reuse:
@@ -575,12 +578,14 @@ class DCGAN(object):
       
       h0 = lrelu(batch_normal(conv2d(input_, self.df_dim*4, name='g_h0_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='g_bn0',reuse=reuse))
       h1 = lrelu(batch_normal(conv2d(h0, self.df_dim*4, name='g_h1_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='g_bn1',reuse=reuse))
+
       h2 = lrelu(batch_normal(deconv2d(h1, [self.batch_size, s_h2, s_w2, self.gf_dim*2], k_h=4, k_w=4, name='g_h2_deconv'),scope='g_bn2',reuse=reuse))
-      h3 = lrelu(batch_normal(conv2d(h2, self.df_dim*2, name='g_h3_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='g_bn3',reuse=reuse))
+      h3 = lrelu(batch_normal(conv2d(tf.concat([h2,input_2],3), self.df_dim*2, name='g_h3_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='g_bn3',reuse=reuse))
 
       h4 = lrelu(batch_normal(deconv2d(h3, [self.batch_size, s_h, s_w, self.gf_dim], k_h=4, k_w=4, name='g_h4_deconv'),scope='g_bn4',reuse=reuse))
-      h5 = lrelu(batch_normal(conv2d(h4, self.df_dim/2, name='g_h5_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='g_bn5',reuse=reuse))
+      h5 = lrelu(batch_normal(conv2d(tf.concat([h4,input_4],3), self.df_dim, name='g_h5_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='g_bn5',reuse=reuse))
       h6 = conv2d(h5, 3, k_h=3, k_w=3, d_h=1, d_w=1, name='g_h6_comv')
+
 
       #h5 = max_pool(conv2d(h4, 3, name='g_h5_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), name='g_h5_maxpool')
 
