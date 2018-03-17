@@ -373,6 +373,11 @@ class DCGAN(object):
         _, summary_str = self.sess.run([opti_CD,self.cd_sum],feed_dict={self.inputs: batch_images,self.mask_inputs: mask_images})
         self.writer.add_summary(summary_str, epoch)
 
+        # 更新判别器
+        _, summary_str = self.sess.run([opti_D,self.d_sum],feed_dict={self.inputs: batch_images,self.mask_inputs: mask_images})
+        self.writer.add_summary(summary_str, epoch)
+
+
         # 更新编码器
         #_, summary_str = self.sess.run([opti_E,self.e_sum],feed_dict={self.inputs: batch_images,self.mask_inputs: x_tilde})
         #self.writer.add_summary(summary_str, epoch)
