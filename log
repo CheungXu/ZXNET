@@ -1,7 +1,9 @@
 2018.3.14 在papernet基础上增加了编码判别器b部分，使用标准GAN样式的损失函数（began分支 '3.14-5'）
-2018.3.15 修复了3.14生成器命名空间的错误u，实现对于一次训练得到的下x_tilde，作为输入进行训练（began分支 '3.14-right'->'3.15'）
+2018.3.15 修复了3.14生成器命名空间的错误，实现类对于一次训练得到的x_tilde，作为输入再次进行训练的过程（began分支 '3.14-right'->'3.15'）
 2018.3.17 (1)禁用了使用x_tilde作为输入再次训练的部分。
           (2)去除encoder中步长为1的卷积层h4,以使得编码器与生成器结构接近对称。
           (3)在encoder和generator之间增加了残差网络跨层连接，但使用的方法不是elementwise sum而是通道叠加+3×3的卷积层代替原本的3×3卷积层。
           (4)增加了sample的数目，分别保存在不同序号文件下。
           (began分支: '3.15' -> '3.17-channel_res_net')
+          (5)修复了第一次训练只更新code_discriminator第二次训练只更新global/local_discriminator的错误。
+          (began分支: '3.17-channel_res_net' -> '3.17-channel_res_net-recover')
