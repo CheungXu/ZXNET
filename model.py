@@ -70,6 +70,7 @@ class DCGAN(object):
     self.gfc_dim = gfc_dim #G的第一个全连接层维数
     self.dfc_dim = dfc_dim #D的第一个全连接层维数
 
+    self.sample_group = 4 #样例组数
     #数据集名称
     self.dataset_name = dataset_name
     self.mask_type = mask_type
@@ -280,12 +281,12 @@ class DCGAN(object):
       print(" [!] Load failed...")
 
     samples_dataet = []
-    for i in range(4):
+    for i in range(self.sample_group):
       if not os.path.exists('./{}/{}/'.format(config.sample_dir, str(i))):
         os.makedirs('./{}/{}/'.format(config.sample_dir, str(i)))
       #载入sample数据
-      sample_files = self.mask_data[0:self.sample_num]
-      sample_real_files = self.data[0:self.sample_num]
+      sample_files = self.mask_data[i*self.sample_num:(i+1) * self.sample_num]
+      sample_real_files = self.data[i*self.sample_num:(i+1) * self.sample_num]
       samples = [
           get_image(sample_file,
                     input_height=self.input_height,
@@ -331,7 +332,7 @@ class DCGAN(object):
       # 计算batch数，// 为整数除 
       #self.data = glob(os.path.join(
        # "./data", config.dataset, self.input_fname_pattern))
-      batch_idxs = min(len(self.data)-self.sample_num, config.train_size) // config.batch_size
+      batch_idxs = min(len(self.data)-self.sample_num * self.sample_group , config.train_size) // config.batch_size
       
       for idx in xrange(0, batch_idxs):
         #获取当前batch图像数据
