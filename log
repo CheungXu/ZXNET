@@ -7,3 +7,4 @@
           (began分支: '3.15' -> '3.17-channel_res_net')
           (5)修复了第一次训练只更新code_discriminator第二次训练只更新global/local_discriminator的错误。
           (began分支: '3.17-channel_res_net' -> '3.17-channel_res_net-recover')
+2018.3.19 使用element sum的残差结构('3.17-channel_res_net-recover' -> '3.18-element_res_net')
