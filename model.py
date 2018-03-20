@@ -587,18 +587,19 @@ class DCGAN(object):
 
       h2 = lrelu(batch_normal(deconv2d(h1, [self.batch_size, s_h2, s_w2, self.gf_dim*2], k_h=4, k_w=4, name='g_h2_deconv'),scope='g_bn2',reuse=reuse))
       h3 = lrelu(batch_normal(conv2d(h2, self.df_dim*2, name='g_h3_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='g_bn3',reuse=reuse))
-      h3 = h3 + input_2
 
-      h4 = lrelu(batch_normal(deconv2d(h3, [self.batch_size, s_h, s_w, self.gf_dim], k_h=4, k_w=4, name='g_h4_deconv'),scope='g_bn4',reuse=reuse))
+      h4 = lrelu(batch_normal(deconv2d(tf.concat([h3,input_2],3), [self.batch_size, s_h, s_w, self.gf_dim], k_h=4, k_w=4, name='g_h4_deconv'),scope='g_bn4',reuse=reuse))
       h5 = lrelu(batch_normal(conv2d(h4, self.df_dim, name='g_h5_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='g_bn5',reuse=reuse))
       h5 = h5 + input_4
+      h6 = lrelu(batch_normal(conv2d(h5, self.df_dim, name='g_h6_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='g_bn6',reuse=reuse))
+      h7 = lrelu(batch_normal(conv2d(h6, self.df_dim, name='g_h7_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='g_bn7',reuse=reuse))
 
-      h6 = conv2d(h5, 3, k_h=3, k_w=3, d_h=1, d_w=1, name='g_h6_comv')
+      h8 = conv2d(h7, 3, k_h=3, k_w=3, d_h=1, d_w=1, name='g_h8_comv')
 
 
       #h5 = max_pool(conv2d(h4, 3, name='g_h5_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), name='g_h5_maxpool')
 
-      return tf.nn.tanh(h6) #tf.nn.tanh(h4), tf.nn.tanh(h5)
+      return tf.nn.tanh(h8) #tf.nn.tanh(h4), tf.nn.tanh(h5)
 
   def KL_loss(self, mu, log_var):
       return -0.5 * tf.reduce_sum(1 + log_var - tf.pow(mu, 2) - tf.exp(log_var))
