@@ -9,3 +9,7 @@
           (began分支: '3.17-channel_res_net' -> '3.17-channel_res_net-recover')
 2018.3.18 使用element sum的残差结构 (began分支：'3.17-channel_res_net-recover' -> '3.18-element_res_net')
 2018.3.19 修复了样例保存的重复的问题 (began分支：'3.18-element_res_net' -> '3.19-element_res_net-recover')
+2018.3.20 (1)最外层的残差结构使用了elementwise sum。
+          (2)内层的残差结构使用类通道叠加。
+          (3)在生成器h5+input后增加类两个卷积层h6/h7。
+          (began分支： '3.19-element_res_net-recover' -> '3.20-ele_channel_res_net')
