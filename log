@@ -13,3 +13,4 @@
           (2)内层的残差结构使用类通道叠加。
           (3)在生成器h5+input后增加类两个卷积层h6/h7。
           (began分支： '3.19-element_res_net-recover' -> '3.20-ele_channel_res_net')
+2018.3.22 使用了SRGAN样式的残差生成器并加入空洞卷积结构。（resgan分支：'3.20-ele_channel_res_net' -> '3.22-SRGAN')
