@@ -17,6 +17,8 @@
 2018.3.28 (1)在SRGAN中去除生成器中的所有的残差结构。
           (2)对生成器不同阶段输出to_rgb图像。
           (3)对输出的rgb使用三个code_discriminator网络判断（根据输入自适应确定网络容量）。
-          （multi-dgan分支： '3.22-SRGAN' -> '3.28-tmp' -> '3.28-multi-dgan-complete')
+          (multi-dgan分支： '3.22-SRGAN' -> '3.28-tmp' -> '3.28-multi-dgan-complete')
           (4)为生成器加入mulit-d的特征损失。
-          （'3.28-multi-dgan-complete' -> '3.28-multi-dgan-v2.0')
+          (multi-dgan分支：'3.28-multi-dgan-complete' -> '3.28-multi-dgan-v2.0')
+2018.3.30 使用papernet+srgan方法，但未使用pixelshuffler。
+          (gan-sr分支：‘3.20-ele_channel_res_net' -> '3.30-paper_net+srgan')
