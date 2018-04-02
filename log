@@ -26,4 +26,4 @@
          (2)启用code_descriminator。
          (3)改进了g和l的损失函数，增加了'竞争'项。
          (4)使用MSE代替判别器的特征损失。
-         ('3.30-paper_net+srgan' -> '4.2-tmp' -> '4.2-paper_net+srgan-v2.0')
+         ('3.30-paper_net+srgan' -> '4.2-tmp' -> '4.2-paper_net+srgan-v2.0' -> '4.2-paper_net+srgan-v2.0-complete')
