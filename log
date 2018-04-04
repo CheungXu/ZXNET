@@ -21,9 +21,12 @@
           (4)为生成器加入mulit-d的特征损失。
           (multi-dgan分支：'3.28-multi-dgan-complete' -> '3.28-multi-dgan-v2.0')
 2018.3.30 使用papernet+srgan方法，但未使用pixelshuffler。
-          (gan-sr分支：‘3.20-ele_channel_res_net' -> '3.30-paper_net+srgan')
+          (gan-sr分支：'3.20-ele_channel_res_net' -> '3.30-paper_net+srgan')
 2018.4.2 (1)在编码器和解码器中增加步长为2的卷积和反卷积。使code的大小变为8*8。
          (2)启用code_descriminator。
          (3)改进了g和l的损失函数，增加了'竞争'项。
          (4)使用MSE代替判别器的特征损失。
-         ('3.30-paper_net+srgan' -> '4.2-tmp' -> '4.2-paper_net+srgan-v2.0' -> '4.2-paper_net+srgan-v2.0-complete')
+         (gan-sr分支：'3.30-paper_net+srgan' -> '4.2-tmp' -> '4.2-paper_net+srgan-v2.0' -> '4.2-paper_net+srgan-v2.0-complete')
+2018.4.3 (1)使用了新的l_loss。
+         (2)实现类分步训练的部分。
+         （gan-sr分支: '4.2-paper_net+srgan-v2.0-complete' -> '4.4-paper_net+srgan-v2.0-newloss' -> '4.4-paper_net+srgan-v2.1')
