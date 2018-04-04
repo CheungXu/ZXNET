@@ -30,3 +30,5 @@
 2018.4.4 (1)使用了新的l_loss。
          (2)实现类分步训练的部分。
          （gan-sr分支: '4.2-paper_net+srgan-v2.0-complete' -> '4.4-paper_net+srgan-v2.0-newloss' -> '4.4-paper_net+srgan-v2.1')
+         (3)加入判别器'竞争'损失函数。
+         （gan-sr分支: '4.4-paper_net+srgan-v2.1' -> '4.4-paper_net+srgan-v2.2')
