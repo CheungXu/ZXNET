@@ -27,6 +27,6 @@
          (3)改进了g和l的损失函数，增加了'竞争'项。
          (4)使用MSE代替判别器的特征损失。
          (gan-sr分支：'3.30-paper_net+srgan' -> '4.2-tmp' -> '4.2-paper_net+srgan-v2.0' -> '4.2-paper_net+srgan-v2.0-complete')
-2018.4.3 (1)使用了新的l_loss。
+2018.4.4 (1)使用了新的l_loss。
          (2)实现类分步训练的部分。
          （gan-sr分支: '4.2-paper_net+srgan-v2.0-complete' -> '4.4-paper_net+srgan-v2.0-newloss' -> '4.4-paper_net+srgan-v2.1')
