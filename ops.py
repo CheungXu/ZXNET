@@ -105,6 +105,29 @@ def conv2d(input_, output_dim,
 
     return conv
 
+"""
+二维分块通道卷积
+"""
+def partition_conv(input_, output_dim, block_h = 8, block_w = 8, scope='partition_conv'):
+  with tf.variable_scope(scope):
+    size = input_.shape.as_list()
+    w_step = size[2] // block_w
+    h_step = size[1] // block_h
+    fms = []
+
+    for i in range(w_step):
+      fm = []
+      for j in range(h_step):
+        img = input_[:,j*block_h:(j+1)*block_h,i*block_w:(i+1)*block_w,:]
+        fm.append(conv2d(img,output_dim,k_h=1,k_w=1,d_h=1,d_w=1,name='pconv_'+str(i)+'_'+str(j)))
+      fms.append(fm)
+
+    for i in range(w_step):
+      fms[i] = tf.concat(fms[i],2)
+
+    return tf.concat(fms,1)
+
+
 
 """
 二维空洞卷积函数
