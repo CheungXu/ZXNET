@@ -11,8 +11,6 @@ from six.moves import xrange
 
 from ops import *
 from utils import *
-d_scale_factor = 0 #0.25
-g_scale_factor =  0 #1 - 0.75/2
 
 
 """
@@ -34,7 +32,7 @@ def conv_out_size_same(size, stride):
 class DCGAN(object):
   def __init__(self, sess, input_height=108, input_width=108, crop=True,
          batch_size=64, sample_num = 64, output_height=64, output_width=64,
-         y_dim=None, z_dim=256, gf_dim=64, df_dim=64,
+         gf_dim=64, df_dim=64,
          gfc_dim=1024, dfc_dim=1024, c_dim=3, dataset_name='default', mask_type = 'default', sampleset_name='default',
          input_fname_pattern='*.jpg', checkpoint_dir=None, sample_dir=None,learning_rate_init = 0.0001):
     """
@@ -42,7 +40,6 @@ class DCGAN(object):
     Args:
       sess: TensorFlow session
       batch_size: The size of batch. Should be specified before training.
-      y_dim: (optional) Dimension of dim for y. [None]
       z_dim: (optional) Dimension of dim for Z. [128]
       gf_dim: (optional) Dimension of gen filters in first conv layer. [64]
       df_dim: (optional) Dimension of discrim filters in first conv layer. [64]
@@ -50,7 +47,7 @@ class DCGAN(object):
       dfc_dim: (optional) Dimension of discrim units for fully connected layer. [1024]
       c_dim: (optional) Dimension of image color. For grayscale input, set to 1. [3]
     """
-    self.sess = sess  #TF设备
+    self.sess = sess  #TF会话
     self.crop = crop  #输入输出大小是否一致
 
     self.batch_size = batch_size #批大小
@@ -61,9 +58,6 @@ class DCGAN(object):
     self.output_height = output_height #输出图像高
     self.output_width = output_width #输出图像宽
 
-    self.y_dim = y_dim #判别器输出y的
-    self.z_dim = z_dim #生成器输入z的维数
-
     self.gf_dim = gf_dim #G的第一个卷积层通道数
     self.df_dim = df_dim #D的第一个卷积层通道数
 
@@ -72,7 +66,9 @@ class DCGAN(object):
 
     #数据集名称
     self.dataset_name = dataset_name
+    #遮挡模式
     self.mask_type = mask_type
+    #样本集名称
     self.sampleset_name = sampleset_name
     #图像文件格式
     self.input_fname_pattern = input_fname_pattern
@@ -83,12 +79,14 @@ class DCGAN(object):
     #c_dim：图像channel数。
     self.data = glob(os.path.join("./data", self.dataset_name, self.input_fname_pattern))
     self.c_dim = imread(self.data[0]).shape[-1]
+
     self.mask_data = [os.path.join("./data", self.dataset_name+'_'+self.mask_type, path.split('/')[3]) for path in self.data]
+
     self.samples_names = glob(os.path.join("./data", self.sampleset_name, '*.png'))
     self.samples_mask = [os.path.join("./data", self.sampleset_name+'_'+self.mask_type, path.split('/')[3]) for path in self.samples_names]
+    
+    #初始化学习率
     self.learn_rate_init = learning_rate_init
-    #self.ep = tf.random_normal(shape=[self.batch_size, self.z_dim])
-    #self.zp = tf.random_normal(shape=[self.batch_size, self.z_dim])
 
     #得到图像是否为灰度图
     self.grayscale = (self.c_dim == 1)
@@ -110,6 +108,7 @@ class DCGAN(object):
     #第4维：图像channels
     self.inputs = tf.placeholder(
       tf.float32, [self.batch_size] + image_dims, name='real_images')
+
     self.mask_inputs = tf.placeholder(
       tf.float32, [self.batch_size,self.input_height, self.input_width, self.c_dim], name='mask_images')
 
@@ -117,11 +116,9 @@ class DCGAN(object):
     mask_inputs = self.mask_inputs
 
     #按照相应的方法建立网络。
-    #self.z_mean,self.z_sigm = self.encoder(mask_inputs)
-    #self.z_x = tf.add(self.z_mean, tf.sqrt(tf.exp(self.z_sigm))*self.ep)
     self.mask_z = self.encoder(mask_inputs)
     self.inputs_z = self.encoder(inputs, reuse=True)
-    #self.super_x_tilde, 
+
     self.x_tilde= self.generator(self.mask_z)
 
 
@@ -131,13 +128,9 @@ class DCGAN(object):
     self.local_height = 64
 
     self.De_pro_tilde = self.discriminator(self.x_tilde)
-    #self.d_tilde_h0,self.d_tilde_h1,self.d_tilde_h2,self.d_tilde_h3,self.d_tilde_h4,self.d_tilde_h5,self.D_tilde = self.discriminator(self.x_tilde)
-    #self.local_l_x_tilde,
     self.local_De_pro_tilde = self.local_discriminator(self.local_x_tilde)
   
     self.D_pro_logits = self.discriminator(inputs, reuse=True)
-    #self.d_real_h0,self.d_real_h1,self.d_real_h2,self.d_real_h3,self.d_real_h4,self.d_real_h5,self.D_logits = self.discriminator(inputs, reuse=True)
-    #self.local_l_x, 
     self.local_D_pro_logits = self.local_discriminator(self.local_inputs, reuse=True)
 
     self.D_logits = linear(tf.concat([self.D_pro_logits,self.local_D_pro_logits],1), 1, 'd_log_res_lin')
@@ -152,56 +145,40 @@ class DCGAN(object):
 
     #D的损失函数
     self.d_loss_real = tf.reduce_mean(
-      sigmoid_cross_entropy_with_logits(self.D_logits, tf.ones_like(self.D_logits) - d_scale_factor))
+      sigmoid_cross_entropy_with_logits(self.D_logits, tf.ones_like(self.D_logits)))
     self.d_loss_tilde = tf.reduce_mean(
-      sigmoid_cross_entropy_with_logits(self.D_tilde, tf.zeros_like(self.D_tilde) + d_scale_factor))
-
-
-    #KL loss
-    #self.kl_loss = self.KL_loss2(self.z_mean, self.z_sigm)
+      sigmoid_cross_entropy_with_logits(self.D_tilde, tf.zeros_like(self.D_tilde)))
+    #D的loss为真假loss之和                      
+    self.D_loss = self.d_loss_real + self.d_loss_tilde
 
     #特征损失
     self.z_loss = self.NLLNormal2(self.mask_z, self.inputs_z) / ((self.input_height / 4) * (self.input_width / 4) * 256) 
     self.LL_loss = self.NLLNormal2(self.x_tilde, self.inputs) / ((self.input_height) * (self.input_width) * 3)
     self.local_LL_loss = self.NLLNormal2(self.local_x_tilde, self.local_inputs) / ((self.local_height) * (self.local_width) * 3)
-    """
-    self.d_h0_loss = self.NLLNormal2(self.d_tilde_h0, self.d_real_h0) / ((self.input_height / 2) * (self.input_width / 2) * 64)
-    self.d_h1_loss = self.NLLNormal2(self.d_tilde_h1, self.d_real_h1) / ((self.input_height / 4) * (self.input_width / 4) * 128)
-    self.d_h2_loss = self.NLLNormal2(self.d_tilde_h2, self.d_real_h2) / ((self.input_height / 8) * (self.input_width / 8) * 256)
-    self.d_h3_loss = self.NLLNormal2(self.d_tilde_h3, self.d_real_h3) / ((self.input_height / 16) * (self.input_width / 16) * 512) 
-    self.d_h4_loss = self.NLLNormal2(self.d_tilde_h4, self.d_real_h4) / ((self.input_height / 32) * (self.input_width / 32) * 512)
-    self.d_h5_loss = self.NLLNormal2(self.d_tilde_h5, self.d_real_h5) / ((self.input_height / 64) * (self.input_width / 64) * 512)
-    self.d_h_loss = self.d_h0_loss  + self.d_h1_loss  + self.d_h2_loss + self.d_h3_loss + self.d_h4_loss  + self.d_h5_loss 
-    """
+
     #编码器损失
     self.encode_loss = - self.z_loss - self.LL_loss - self.local_LL_loss 
 
-    #D的loss为真假loss之和                      
-    self.D_loss = self.d_loss_real + self.d_loss_tilde #+ self.d_h_loss / 500 
-
     #G的损失函数
-    self.G_loss_tilde = tf.reduce_mean(sigmoid_cross_entropy_with_logits(self.D_tilde, tf.ones_like(self.D_tilde) - g_scale_factor))
-    self.G_loss = self.G_loss_tilde - self.LL_loss #- self.d_h_loss / 500
+    self.G_loss_tilde = tf.reduce_mean(sigmoid_cross_entropy_with_logits(self.D_tilde, tf.ones_like(self.D_tilde)))
+    self.G_loss = self.G_loss_tilde - self.LL_loss
 
-    #histogram_summary用于生成分布图，用scalar_summary记录存储值
-    #记录d、d_、g分布。
-    #self.d_sum = histogram_summary("d", self.D_pro_logits)
-    #self.d__sum = histogram_summary("d_", self.De_pro_tilde)
+ 
+    #用scalar_summary记录日志
+    #记录图像。
     self.input_sum = image_summary('Inputs',self.inputs)
     self.G_sum = image_summary("G", self.x_tilde)
-    #self.Su_G_sum = image_summary("S_G", self.super_x_tilde)
     self.local_input_sum = image_summary('Local_Input',self.local_inputs)
     self.local_G_sum = image_summary("Local_G", self.local_x_tilde)
-    #self.z_sum = histogram_summary("z", self.z_x)
 
     #记录损失函数
-    #self.kl_loss_sum = scalar_summary("kl_loss", self.kl_loss)
     self.z_loss_sum = scalar_summary("z_loss", -self.z_loss)
-    #self.d_h_loss_sum = scalar_summary("z_loss", -self.d_h_loss)
     self.ll_loss_sum = scalar_summary("ll_loss", -self.LL_loss)
-    #self.local_ll_loss_sum = scalar_summary("local_ll_loss", -self.local_LL_loss)
+    self.local_ll_loss_sum = scalar_summary("local_ll_loss", -self.local_LL_loss)
+
     self.d_loss_real_sum = scalar_summary("d_loss_real", self.d_loss_real)
     self.d_loss_tilde_sum = scalar_summary("d_loss_tilde", self.d_loss_tilde)
+
     self.e_loss_sum = scalar_summary("e_loss", self.encode_loss)
     self.g_loss_sum = scalar_summary("g_loss", self.G_loss)
     self.d_loss_sum = scalar_summary("d_loss", self.D_loss)
@@ -216,7 +193,7 @@ class DCGAN(object):
     self.saver = tf.train.Saver(max_to_keep = 0)
 
   def train(self, config):
-    #添加优化器（优化方法）
+    #添加学习率衰减
     global_step = tf.Variable(0, trainable=False)
     add_global = global_step.assign_add(1)
     new_learning_rate = tf.train.exponential_decay(self.learn_rate_init, global_step=global_step, decay_steps=1000,
@@ -264,6 +241,7 @@ class DCGAN(object):
       print(" [*] Load SUCCESS")
     else:
       print(" [!] Load failed...")
+
     #载入sample数据
     sample_files = self.mask_data[0:self.sample_num]
     sample_real_files = self.data[0:self.sample_num]
@@ -284,9 +262,9 @@ class DCGAN(object):
                   crop=self.crop,
                   grayscale=self.grayscale) for sample_file in sample_real_files]
     #合并通道
-    mask_img = get_image(os.path.join("./data",self.dataset_name+'_'+self.mask_type,'mask.'+self.input_fname_pattern.split('.')[1]),
-                         input_height=self.input_height,input_width=self.input_width,resize_height=self.input_height,resize_width=self.input_width,grayscale=True)
-    new_mask = mask_img[:,:,np.newaxis]
+    #mask_img = get_image(os.path.join("./data",self.dataset_name+'_'+self.mask_type,'mask.'+self.input_fname_pattern.split('.')[1]),
+     #                    input_height=self.input_height,input_width=self.input_width,resize_height=self.input_height,resize_width=self.input_width,grayscale=True)
+    #new_mask = mask_img[:,:,np.newaxis]
     sample = samples #[np.concatenate([im,new_mask],axis=2) for im in samples]
 
     #转换数据类型
@@ -298,24 +276,24 @@ class DCGAN(object):
       sample_inputs = np.array(sample).astype(np.float32)
       sample_real_save = np.array(sample_real).astype(np.float32)
       sample_inputs_save = np.array(samples).astype(np.float32)
-    dropout_ratio = 1.0000#0.5000
+
     #保存测试图像
     save_images(sample_inputs_save, image_manifold_size(sample_inputs_save.shape[0]),
           './{}/train_input.png'.format(config.sample_dir))
     save_images(sample_real_save, image_manifold_size(sample_real_save.shape[0]),
           './{}/train_real.png'.format(config.sample_dir))
+
     #开始迭代
+    #将图置为只读
     self.sess.graph.finalize() 
     for epoch in xrange(counter,config.epoch):
       # 计算batch数，// 为整数除 
-      #self.data = glob(os.path.join(
-       # "./data", config.dataset, self.input_fname_pattern))
       batch_idxs = min(len(self.data)-self.sample_num, config.train_size) // config.batch_size
       
       for idx in xrange(0, batch_idxs):
         #获取当前batch图像数据
-        batch_files = self.data[self.sample_num+idx*config.batch_size:self.sample_num+(idx+1)*config.batch_size]
-        mask_batch_files = self.mask_data[self.sample_num+idx*config.batch_size:self.sample_num+(idx+1)*config.batch_size]
+        batch_files = self.data[self.sample_num + idx * config.batch_size:self.sample_num + (idx+1) * config.batch_size]
+        mask_batch_files = self.mask_data[self.sample_num + idx * config.batch_size:self.sample_num + (idx+1) * config.batch_size]
         batch = [
             get_image(batch_file,
                       input_height=self.input_height,
@@ -353,54 +331,50 @@ class DCGAN(object):
         self.writer.add_summary(summary_str, epoch)
         
         # 更新学习率
-        new_learn_rate = self.sess.run(new_learning_rate)
-        
         if new_learn_rate > 0.00005:
-          self.sess.run(add_global)  
+          self.sess.run(add_global) 
+        new_learn_rate = self.sess.run(new_learning_rate)
         
         # 输出损失
         D_loss, fake_loss, encode_loss, LL_loss, z_loss, new_learn_rate = self.sess.run([self.D_loss, self.G_loss, self.encode_loss,self.LL_loss, self.z_loss, new_learning_rate], feed_dict={self.inputs:batch_images,self.mask_inputs: mask_images})
         print("Epochs %d/%d Batch %d/%d: D: loss = %.7f G: loss=%.7f E: loss=%.7f LL loss=%.7f Z loss=%.7f, LR=%.7f" % (epoch, config.epoch, idx, batch_idxs,D_loss, fake_loss, encode_loss, LL_loss, z_loss, new_learn_rate))
       
-      #更新droupout层激活率
-      #dropout_ratio += 0.1000
-
-      #if dropout_ratio >1.0000:
-       # dropout_ratio = 0.8000
       # 保存图像
       if np.mod(epoch, 1) == 0:
         sample_outputs= self.sess.run(
               self.x_tilde,
               feed_dict={self.mask_inputs: sample_inputs})
+
         save_images(sample_outputs, image_manifold_size(sample_outputs.shape[0]),
               './{}/train_output{:02d}_{:04d}.png'.format(config.sample_dir, epoch, idx))
-        #save_images(super_sample_outputs, image_manifold_size(super_sample_outputs.shape[0]),
-         #     './{}/train_output{:02d}_{:04d}_super.png'.format(config.sample_dir, epoch, idx))
+
         print("[Sample] : %s" % ('./{}/train_{:02d}_{:04d}.png'.format(config.sample_dir, epoch, idx)))
-        #print("[Sample] d_loss: %.8f, g_loss: %.8f, e_loss: %.8f" % (d_loss, g_loss,e_loss)) 
+
       # 保存模型
-      #counter += 1
       if np.mod(epoch, 1) == 0:
         self.save(config.checkpoint_dir, epoch)
         print("Save checkpoint in : %s, counter: %d" % (config.checkpoint_dir,epoch))
 
+
   def discriminator(self, image, reuse=False):
-    #判别器D，参数y为标签，reuse表示是否复用参数。
+    #判别器D，reuse表示是否复用参数。
     with tf.variable_scope("discriminator") as scope:
       if reuse:
         scope.reuse_variables()
 
-      #根据是否存在标签，建立相应的网络
-      #df_dim为第一层卷积层纬度（卷积核个数），默认64.
-      #函数conv2d/lrelu/linear见ops.py模块
-      """
-      网络结构：（图像大小以输入64×64×3为例）
-      卷积核大小默认5*5，步长2，bs为batch_size。
-      第一层：h0，卷积核64个，输入图像大小bs*64*64*3。
-      第二层：h1，卷积核128个，输入图像大小bs*32*32*64。
-      第三层：h2，卷积核254个，输入图像大小bs*16*16*128。
-      第四层：h3，卷积核512个，输入图像大小bs*8*8*254，输出图像大小bs*4*4*512。
+      #建立网络
+      #df_dim为第一层卷积层维数（卷积核个数），默认64.
+      #函数conv2d/lrelu/linear/batch_normal见ops.py模块
 
+      """
+      网络结构：（图像大小以输入128×128×3为例）
+      卷积核大小默认5*5，步长2，bs为batch_size。
+      第一层卷积：h0，卷积核64个，输入图像大小bs*128*128*3。
+      第二层卷积：h1，卷积核128个，输入图像大小bs*64*64*64。
+      第三层卷积：h2，卷积核256个，输入图像大小bs*32*32*128。
+      第四层卷积：h3，卷积核512个，输入图像大小bs*16*16*256。
+      第五层卷积：h4，卷积核512个，输入图像大小bs*8*8*512，输出图像大小bs*4*4*512。
+      第六层全连接：h5，输入bs*8192, 输出bs*1024。
       """
 
       h0 = lrelu(batch_normal(conv2d(image, self.df_dim, k_h=5, k_w=5, d_h=2, d_w=2, name='gl_d_h0_conv'),scope='gl_d_bn0', reuse=reuse)) #64*64*64
@@ -408,86 +382,75 @@ class DCGAN(object):
       h2 = lrelu(batch_normal(conv2d(h1, self.df_dim*4, k_h=5, k_w=5, d_h=2, d_w=2, name='gl_d_h2_conv'),scope='gl_d_bn2', reuse=reuse)) #16*16*256
       h3 = lrelu(batch_normal(conv2d(h2, self.df_dim*8, k_h=5, k_w=5, d_h=2, d_w=2, name='gl_d_h3_conv'),scope='gl_d_bn3', reuse=reuse)) #8*8*512
       h4 = lrelu(batch_normal(conv2d(h3, self.df_dim*8, k_h=5, k_w=5, d_h=2, d_w=2, name='gl_d_h4_conv'),scope='gl_d_bn4', reuse=reuse)) #4*4*512
-      #h5 = lrelu(batch_normal(conv2d(h4, self.df_dim*8, k_h=5, k_w=5, d_h=2, d_w=2, name='gl_d_h5_conv'),scope='gl_d_bn5', reuse=reuse)) #4*4*512
-      h6 = lrelu(batch_normal(linear(tf.reshape(h4, [self.batch_size, -1]), 1024, 'l_d_h6_lin'), scope='l_d_bn6', reuse=reuse))
-      #h7 = linear(h6, 1, 'gl_d_lin9')
-      """
-
-      3.12
-      h0 = lrelu(batch_normal(conv2d(image, self.df_dim, name='gl_d_h0_conv'),scope='gl_d_bn0', reuse=reuse)) #128*128*64
-      h1 = lrelu(batch_normal(conv2d(h0, self.df_dim*2, d_h=2, d_w=2, name='gl_d_h1_conv'), scope='gl_d_bn1', reuse=reuse)) #64*64*128
-      h2 = lrelu(batch_normal(conv2d(h1, self.df_dim*4, name='gl_d_h2_conv'), scope='gl_d_bn2', reuse=reuse)) #64*64*256
-      h3 = lrelu(batch_normal(conv2d(h2, self.df_dim*8, d_h=2, d_w=2, name='gl_d_h3_conv'), scope='gl_d_bn3', reuse = reuse)) #32*32*512
-      h4 = lrelu(batch_normal(conv2d(h3, self.df_dim*8, name='gl_d_h4_conv'), scope='gl_d_bn4', reuse=reuse)) #32*32*512
-      h5 = lrelu(batch_normal(conv2d(h4, self.df_dim*8, d_h=2, d_w=2, name='gl_d_h5_conv'), scope='gl_d_bn5', reuse=reuse)) #16*16*512
-      h6 = lrelu(batch_normal(conv2d(h5, self.df_dim*8, d_h = 2, d_w=2,name='gl_d_h6_conv'), scope='gl_d_bn6', reuse=reuse)) #16*16*512
-      h7 = lrelu(batch_normal(conv2d(h6, self.df_dim*8,  d_h = 2, d_w=2,name='gl_d_h7_conv'), scope='gl_d_bn7', reuse=reuse)) #8*8*128
-      h8 = lrelu(batch_normal(linear(tf.reshape(h7, [self.batch_size, -1]), 1024, 'l_d_h8_lin'), scope='l_d_bn8', reuse=reuse))
-      h9 = linear(h8, 1, 'gl_d_lin9')
-      """
-
-
-
-      #h6 = lrelu(batch_normal(linear(tf.reshape(h5, [self.batch_size, -1]), 1024, 'gl_d_h6_lin'), scope='gl_d_bn6', reuse=reuse)) 
-      #h7 = lrelu(batch_normal(linear(h6, 1, 'gl_d_h7_lin'), scope='gl_d_bn7', reuse=reuse))
+      
+      h5 = lrelu(batch_normal(linear(tf.reshape(h4, [self.batch_size, -1]), 1024, 'l_d_h5_lin'), scope='l_d_bn5', reuse=reuse)) #1024
+ 
       #返回结果
-      return h6 #tf.reshape(h7, [self.batch_size, -1])
+      return h5
 
   def local_discriminator(self, image, reuse=False):
-    #判别器D，参数y为标签，reuse表示是否复用参数。
+    #局部判别器D，reuse表示是否复用参数。
     with tf.variable_scope("local_discriminator") as scope:
       if reuse:
         scope.reuse_variables()
 
-      #根据是否存在标签，建立相应的网络
+      #建立相应的网络
       #df_dim为第一层卷积层纬度（卷积核个数），默认64.
       #函数conv2d/lrelu/linear见ops.py模块
+
       """
-      网络结构：（图像大小以输入32×32×3为例）
+      网络结构：（图像大小以输入64×64×3为例）
       卷积核大小默认5*5，步长2，bs为batch_size。
-      第一层：h0，卷积核64个，输入图像大小bs*32*32*3。
-      第二层：h1，卷积核128个，输入图像大小bs*16*16*64。
-      第三层：h2，卷积核254个，输入图像大小bs*8*8*128, 输出图像大小bs*4*4*512
+      第一层卷积：h0，卷积核64个，输入图像大小bs*64*64*3。
+      第二层卷积：h1，卷积核256个，输入图像大小bs*32*32*64。
+      第三层卷积：h2，卷积核512个，输入图像大小bs*16*16*512。
+      第四层卷积：h3，卷积核512个，输入图像大小bs*8*8*512，, 输出图像大小bs*4*4*512。
+      第五层全连接：h4，输入bs*8192, 输出bs*1024。
       """
       h0 = lrelu(batch_normal(conv2d(image, self.df_dim, name='l_d_h0_conv',k_h=5, k_w=5, d_h=2, d_w=2),scope='l_d_bn0',reuse=reuse)) #32*32*64
-      #h1 = lrelu(batch_normal(conv2d(h0, self.df_dim*2, k_h=5, k_w=2, d_h=1, d_w=1, name='l_d_h1_conv'), scope='l_d_bn1', reuse=reuse)) #32*32*128
-      h2 = conv2d(h0, self.df_dim*4, k_h=5, k_w=5, d_h=2, d_w=2,name='l_d_h2_conv') #16*16*256
-      middle = h2
-      h2 = lrelu(batch_normal(h2, scope='l_d_bn2', reuse=reuse))
+      h1 = lrelu(batch_normal(conv2d(h0, self.df_dim*4, k_h=5, k_w=5, d_h=2, d_w=2,name='l_d_h1_conv'), scope='l_d_bn1', reuse=reuse)) #16*16*256
+      h2 = lrelu(batch_normal(conv2d(h1, self.df_dim*8, k_h=5, k_w=5, d_h=2, d_w=2, name='l_d_h2_conv'), scope='l_d_bn2', reuse=reuse)) #8*8*512
+      h3 = lrelu(batch_normal(conv2d(h2, self.df_dim*8, k_h=5, k_w=5, d_h=2, d_w=2, name='l_d_h3_conv'), scope='l_d_bn3', reuse=reuse)) #4*4*512
 
-      h3 = lrelu(batch_normal(conv2d(h2, self.df_dim*8, k_h=5, k_w=5, d_h=2, d_w=2, name='l_d_h3_conv'), scope='l_d_bn3', reuse=reuse)) #8*8*512
-      h4 = lrelu(batch_normal(conv2d(h3, self.df_dim*8, k_h=5, k_w=5, d_h=2, d_w=2, name='l_d_h4_conv'), scope='l_d_bn4', reuse=reuse)) #4*4*512
+      h4 = lrelu(batch_normal(linear(tf.reshape(h3, [self.batch_size, -1]), 1024, 'l_d_h4_lin'), scope='l_d_bn4', reuse=reuse))
 
-      h5 = lrelu(batch_normal(linear(tf.reshape(h4, [self.batch_size, -1]), 1024, 'l_d_h5_lin'), scope='l_d_bn5', reuse=reuse))
       #返回结果
-      return h5
+      return h4
 
   def encoder(self,image,reuse=False):
     with tf.variable_scope("encoder") as scope:
       if reuse:
         scope.reuse_variables()
       """
-      不存在标签的网络结构：（图像大小以输入96×96×3为例）
-      卷积核大小默认5*5，步长2，bs为batch_size。
-      第一层：h0，卷积核64个，输入图像大小bs*96*96*3。
-      第二层：h1，卷积核128个，输入图像大小bs*48*48*64。
-      第三层：h2，卷积核254个，输入图像大小bs*24*24*128。
-      第四层：h3，卷积核512个，输入图像大小bs*12*12*254，输出图像大小bs*6*6*512。
-      第五层为线性分类层，输入大小[batch_size,18432]。
-      """
-      h0 = lrelu(batch_normal(conv2d(image, self.df_dim, name='e_h0_conv',k_h=5, k_w=5), scope='e_bn0',reuse=reuse))
-      
-      h1 = lrelu(batch_normal(conv2d(h0, self.df_dim*2, name='e_h1_conv', k_h=3, k_w=3, d_h = 2,d_w = 2), scope='e_bn1',reuse=reuse))
-      h2 = lrelu(batch_normal(conv2d(h1, self.df_dim*2, name='e_h2_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='e_bn2',reuse=reuse))
+      网络结构：（图像大小以输入128×128×3为例）
+      第一层卷积：h0，卷积核64个，输入图像大小bs*128*128*3。
 
-      h3 = lrelu(batch_normal(conv2d(h2, self.df_dim*4, name='e_h3_conv', k_h=3, k_w=3, d_h = 2,d_w = 2), scope='e_bn3',reuse=reuse))     
-      h4 = lrelu(batch_normal(conv2d(h3, self.df_dim*4, name='e_h4_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='e_bn4',reuse=reuse))
-      h5 = lrelu(batch_normal(conv2d(h4, self.df_dim*4, name='e_h5_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='e_bn5',reuse=reuse))
+      第二层卷积：h1，卷积核128个，输入图像大小bs*128*128*64。
+      第三层卷积：h2，卷积核128个，输入图像大小bs*64*64*128。
+
+      第四层卷积：h3，卷积核256个，输入图像大小bs*64*64*128。
+      第五层卷积：h4，卷积核256个，输入图像大小bs*32*32*256。
+
+      第六层卷积：h5，卷积核256个，输入图像大小bs*32*32*256。
+      第七层扩展卷积：h6，卷积核256个，输入图像大小bs*32*32*256，扩展率2。
+      第八层扩展卷积：h7，卷积核256个，输入图像大小bs*32*32*256，扩展率4。
+      第九层扩展卷积：h8，卷积核256个，输入图像大小bs*32*32*256，扩展率8。
+      第十层扩展卷积：h9，卷积核256个，输入图像大小bs*32*32*256，扩展率16。
+      """
+
+      h0 = lrelu(batch_normal(conv2d(image, self.df_dim, name='e_h0_conv',k_h=5, k_w=5), scope='e_bn0',reuse=reuse)) #128*128*64
       
-      h6 = lrelu(batch_normal(dilated_conv(h5, self.df_dim*4, rate=2, name='e_h6_dilconv'), scope='e_bn6',reuse=reuse))
-      h7 = lrelu(batch_normal(dilated_conv(h6, self.df_dim*4, rate=4, name='e_h7_dilconv'), scope='e_bn7',reuse=reuse))
-      h8 = lrelu(batch_normal(dilated_conv(h7, self.df_dim*4, rate=8, name='e_h8_dilconv'), scope='e_bn8',reuse=reuse))
-      h9 = lrelu(batch_normal(dilated_conv(h8, self.df_dim*4, rate=16, name='e_h9_dilconv'), scope='e_bn9',reuse=reuse))
+      h1 = lrelu(batch_normal(conv2d(h0, self.df_dim*2, name='e_h1_conv', k_h=3, k_w=3, d_h = 2,d_w = 2), scope='e_bn1',reuse=reuse)) #64*64*128
+      h2 = lrelu(batch_normal(conv2d(h1, self.df_dim*2, name='e_h2_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='e_bn2',reuse=reuse)) #64*64*128
+
+      h3 = lrelu(batch_normal(conv2d(h2, self.df_dim*4, name='e_h3_conv', k_h=3, k_w=3, d_h = 2,d_w = 2), scope='e_bn3',reuse=reuse)) #32*32*256     
+      h4 = lrelu(batch_normal(conv2d(h3, self.df_dim*4, name='e_h4_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='e_bn4',reuse=reuse)) #32*32*256 
+      
+      h5 = lrelu(batch_normal(conv2d(h4, self.df_dim*4, name='e_h5_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='e_bn5',reuse=reuse)) #32*32*256 
+      h6 = lrelu(batch_normal(dilated_conv(h5, self.df_dim*4, rate=2, name='e_h6_dilconv'), scope='e_bn6',reuse=reuse)) #32*32*256 
+      h7 = lrelu(batch_normal(dilated_conv(h6, self.df_dim*4, rate=4, name='e_h7_dilconv'), scope='e_bn7',reuse=reuse)) #32*32*256 
+      h8 = lrelu(batch_normal(dilated_conv(h7, self.df_dim*4, rate=8, name='e_h8_dilconv'), scope='e_bn8',reuse=reuse)) #32*32*256 
+      h9 = lrelu(batch_normal(dilated_conv(h8, self.df_dim*4, rate=16, name='e_h9_dilconv'), scope='e_bn9',reuse=reuse)) #32*32*256 
       
       return h9
  
@@ -496,52 +459,48 @@ class DCGAN(object):
     with tf.variable_scope("generator") as scope:
       if reuse:
         scope.reuse_variables()
+
       """
-      s_h/s_w输出图像高宽（96，96）(64,64)
-      s_h2/s_w2前一层高宽（48，48）(32,32)
-      s_h4/s_h4前两层高宽（24，24）(16,16)
-      s_h8/s_h8前三层高宽（12，12）(8,8)
-      s_h16/s_h16前四层高宽（6，6）(4,4)
+      s_h/s_w输出图像高宽（128，128）
+      s_h2/s_w2前一层高宽（64，64）
+      s_h4/s_h4前两层高宽（32，32）
+      s_h8/s_h8前三层高宽（16，16）
+      s_h16/s_h16前四层高宽（8，8)
       """
       s_h, s_w = self.output_height, self.output_width
       s_h2, s_w2 = conv_out_size_same(s_h, 2), conv_out_size_same(s_w, 2)
       s_h4, s_w4 = conv_out_size_same(s_h2, 2), conv_out_size_same(s_w2, 2)
       s_h8, s_w8 = conv_out_size_same(s_h4, 2), conv_out_size_same(s_w4, 2)
       s_h16, s_w16 = conv_out_size_same(s_h8, 2), conv_out_size_same(s_w8, 2)
-      """
-      卷积核大小默认5*5，步长2，bs为batch_size。
 
-      第一线性层：输入z大小bs*100，输出大小bs*18432（64*8*6*6）。
-      reshape后h0大小：1*6*6*512
 
-      第一反卷积层：h1，输出大小bs*12*12*256。
-      第二反卷积层：h2，输出大小bs*24*24*128。
-      第三反卷积层：h3，输出大小bs*48*48*64。
-      第四反卷积层：h4，输出大小bs*96*96*3。
-      返回tanh激活后的结果。
       """
-      # project `z` and reshape
+      第一层卷积： h0, 卷积核256个，输入大小bs×32*32*256。
+
+      第二层反卷积：h1, 卷积核256个，输入大小bs*32*32*256。
+      第三层卷积：h2, 卷积核128个，输入大小bs*64*64*256
+
+      第四层反卷积：h3, 卷积核128个，输入大小bs*64*64*128。
+      第五层卷积： h4, 卷积核64个，输入入大小bs*128*128*128。
+
+      第六层卷积： h5, 卷积核32个，输入大小bs*128*128*64。
+      第七层卷积： h6, 卷积核3个，输入大小bs*128*128*32, 输出大小bs*128*128*3。
+      """
       
-      h0 = lrelu(batch_normal(conv2d(input_, self.df_dim*4, name='e_h0_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='e_bn0',reuse=reuse))
-      h1 = lrelu(batch_normal(conv2d(h0, self.df_dim*4, name='e_h1_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='e_bn1',reuse=reuse))
-      h2 = lrelu(batch_normal(deconv2d(h1, [self.batch_size, s_h2, s_w2, self.gf_dim*2], k_h=4, k_w=4, name='g_h2_deconv'),scope='g_bn2',reuse=reuse))
-      h3 = lrelu(batch_normal(conv2d(h2, self.df_dim*2, name='g_h3_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='g_bn3',reuse=reuse))
+      h0 = lrelu(batch_normal(conv2d(input_, self.df_dim*4, name='e_h0_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='e_bn0',reuse=reuse)) #32*32*256
 
-      h4 = lrelu(batch_normal(deconv2d(h3, [self.batch_size, s_h, s_w, self.gf_dim], k_h=4, k_w=4, name='g_h4_deconv'),scope='g_bn4',reuse=reuse))
-      h5 = lrelu(batch_normal(conv2d(h4, self.df_dim/2, name='g_h5_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='g_bn5',reuse=reuse))
-      h6 = conv2d(h5, 3, k_h=3, k_w=3, d_h=1, d_w=1, name='g_h6_comv')
+      h1 = lrelu(batch_normal(conv2d(h0, self.df_dim*4, name='e_h1_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='e_bn1',reuse=reuse)) #64*64*256
+      h2 = lrelu(batch_normal(deconv2d(h1, [self.batch_size, s_h2, s_w2, self.gf_dim*2], k_h=4, k_w=4, name='g_h2_deconv'),scope='g_bn2',reuse=reuse)) #64*64*128
 
-      #h5 = max_pool(conv2d(h4, 3, name='g_h5_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), name='g_h5_maxpool')
+      h3 = lrelu(batch_normal(conv2d(h2, self.df_dim*2, name='g_h3_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='g_bn3',reuse=reuse)) #128*128*128
+      h4 = lrelu(batch_normal(deconv2d(h3, [self.batch_size, s_h, s_w, self.gf_dim], k_h=4, k_w=4, name='g_h4_deconv'),scope='g_bn4',reuse=reuse)) #128*128*64
 
-      return tf.nn.tanh(h6) #tf.nn.tanh(h4), tf.nn.tanh(h5)
+      h5 = lrelu(batch_normal(conv2d(h4, self.df_dim/2, name='g_h5_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='g_bn5',reuse=reuse)) #128*128*32
+      h6 = conv2d(h5, 3, k_h=3, k_w=3, d_h=1, d_w=1, name='g_h6_comv') #128*128*3
 
-  def KL_loss(self, mu, log_var):
-      return -0.5 * tf.reduce_sum(1 + log_var - tf.pow(mu, 2) - tf.exp(log_var))
+      #返回tanh激活后的结果。
+      return tf.nn.tanh(h6)
 
-  def KL_loss2(self, mu, log_var):
-      return tf.reduce_sum(-0.5 * tf.reduce_sum(1 + tf.clip_by_value(log_var, -10.0, 10.0) 
-                                   - tf.square(tf.clip_by_value(mu, -10.0, 10.0) ) 
-                                   - tf.exp(tf.clip_by_value(log_var, -10.0, 10.0) ), 1))
   def NLLNormal(self, pred, target):
       c = -0.5 * tf.log(2 * np.pi)
       multiplier = 1.0 / (2.0 * 1)
