@@ -132,9 +132,9 @@ class DCGAN(object):
   
     self.D_pro_logits = self.discriminator(inputs, reuse=True)
     self.local_D_pro_logits = self.local_discriminator(self.local_inputs, reuse=True)
-
-    self.D_logits = linear(tf.concat([self.D_pro_logits,self.local_D_pro_logits],1), 1, 'd_lo_res_lin')
-    self.D_tilde = linear(tf.concat([self.De_pro_tilde,self.local_De_pro_tilde], 1), 1, 'd_lo_res_lin',reuse=True)
+    
+    self.D_logits = self.res_linear(tf.concat([self.D_pro_logits,self.local_D_pro_logits], 1))
+    self.D_tilde = self.res_linear(tf.concat([self.De_pro_tilde,self.local_De_pro_tilde], 1),reuse=True)
 
     #获取交叉熵损失函数
     def sigmoid_cross_entropy_with_logits(x, y):
@@ -193,6 +193,9 @@ class DCGAN(object):
     self.d_vars = [var for var in t_vars if 'd_' in var.name]
     self.g_vars = [var for var in t_vars if 'g_' in var.name]
     self.e_vars = [var for var in t_vars if 'e_' in var.name]
+    print('d',self.d_vars)
+    print('g',self.g_vars)
+    print('e',self.e_vars)
     #添加存储器
     self.saver = tf.train.Saver(max_to_keep = 0)
 
@@ -387,7 +390,7 @@ class DCGAN(object):
       h3 = lrelu(batch_normal(conv2d(h2, self.df_dim*8, k_h=5, k_w=5, d_h=2, d_w=2, name='gl_d_h3_conv'),scope='gl_d_bn3', reuse=reuse)) #8*8*512
       h4 = lrelu(batch_normal(conv2d(h3, self.df_dim*8, k_h=5, k_w=5, d_h=2, d_w=2, name='gl_d_h4_conv'),scope='gl_d_bn4', reuse=reuse)) #4*4*512
       
-      h5 = lrelu(batch_normal(linear(tf.reshape(h4, [self.batch_size, -1]), 1024, 'l_d_h5_lin'), scope='l_d_bn5', reuse=reuse)) #1024
+      h5 = lrelu(batch_normal(linear(tf.reshape(h4, [self.batch_size, -1]), 1024, 'gl_d_h5_lin'), scope='gl_d_bn5', reuse=reuse)) #1024
  
       #返回结果
       return h5
@@ -420,6 +423,16 @@ class DCGAN(object):
 
       #返回结果
       return h4
+
+  def res_linear(self, input_, reuse=False):
+    with tf.variable_scope("d_liner") as scope:
+      if reuse:
+        scope.reuse_variables()
+      h0 = lrelu(batch_normal(linear(input_, 512, 'd_res_lin0'), scope='d_lin_bn0', reuse=reuse))
+      h1 = linear(input_, 1, 'd_res_lin1')
+   
+    return h1
+
 
   def encoder(self,image,reuse=False):
     with tf.variable_scope("encoder") as scope:
