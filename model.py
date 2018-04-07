@@ -152,11 +152,11 @@ class DCGAN(object):
     self.D_loss = self.d_loss_real + self.d_loss_tilde
 
     #特征损失
-    self.z_loss = self.NLLNormal2(self.mask_z, self.inputs_z) / ((self.input_height / 8) * (self.input_width / 8) * 256) 
+    self.z_loss_0 = self.NLLNormal2(self.mask_z, self.inputs_z) / ((self.input_height / 8) * (self.input_width / 8) * 256) 
     self.z_loss_2 = self.NLLNormal2(self.mask_2, self.inputs_2) / ((self.input_height / 2) * (self.input_width / 2) * 128) 
     self.z_loss_4 = self.NLLNormal2(self.mask_4, self.inputs_4) / ((self.input_height / 4) * (self.input_width / 4) * 256) 
     self.z_loss_5 = self.NLLNormal2(self.mask_5, self.inputs_5) / ((self.input_height / 8) * (self.input_width / 8) * 256) 
-    self.z_loss = (self.z_loss + self.z_loss_2 + self.z_loss_4 + self.z_loss_5) / 4
+    self.z_loss = (self.z_loss_0 + self.z_loss_2 + self.z_loss_4 + self.z_loss_5) / 4
     self.LL_loss = self.NLLNormal2(self.x_tilde, self.inputs) / ((self.input_height) * (self.input_width) * 3)
     self.local_LL_loss = self.NLLNormal2(self.local_x_tilde, self.local_inputs) / ((self.local_height) * (self.local_width) * 3)
 
@@ -498,11 +498,11 @@ class DCGAN(object):
       h2 = lrelu(batch_normal(deconv2d(h1, [self.batch_size, s_h4, s_w4, self.gf_dim*4], k_h=3, k_w=3, name='g_h2_deconv'),scope='g_bn2',reuse=reuse)) #32*32*256
 
       h2_ = lrelu(batch_normal(partition_conv(tf.concat([h2,input_4],3),self.df_dim*4, scope='g_ph2_conv'), scope='g_bn2_', reuse=reuse)) #32*32*256
-      h3 = lrelu(batch_normal(conv2d(h2, self.df_dim*4, name='g_h3_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='g_bn3',reuse=reuse)) #32*32*256
+      h3 = lrelu(batch_normal(conv2d(h2_, self.df_dim*4, name='g_h3_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='g_bn3',reuse=reuse)) #32*32*256
       h4 = lrelu(batch_normal(deconv2d(h3, [self.batch_size, s_h2, s_w2, self.gf_dim*2], k_h=3, k_w=3, name='g_h4_deconv'),scope='g_bn4',reuse=reuse)) #64*64*128
 
       h4_ = lrelu(batch_normal(partition_conv(tf.concat([h4,input_2],3),self.df_dim*2, scope='g_ph4_conv'), scope='g_bn4_', reuse=reuse)) #64*64*128
-      h5 = lrelu(batch_normal(conv2d(h4, self.df_dim*2, name='g_h5_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='g_bn5',reuse=reuse)) #64*64*128
+      h5 = lrelu(batch_normal(conv2d(h4_, self.df_dim*2, name='g_h5_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='g_bn5',reuse=reuse)) #64*64*128
       h6 = lrelu(batch_normal(deconv2d(h5, [self.batch_size, s_h, s_w, self.gf_dim], k_h=3, k_w=3, name='g_h6_deconv'),scope='g_bn6',reuse=reuse)) #128*128*64
 
       #h6_ = lrelu(batch_normal(partition_conv(tf.concat([h6,image],3),self.df_dim, scope='g_ph4_conv'), scope='g_bn4_', reuse=reuse)) #64*64*64

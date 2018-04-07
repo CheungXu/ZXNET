@@ -114,12 +114,15 @@ def partition_conv(input_, output_dim, block_h = 8, block_w = 8, scope='partitio
     w_step = size[2] // block_w
     h_step = size[1] // block_h
     fms = []
-
+    imgs = []
+    #for i in range(w_step):
+     # for j in range(h_step):
+      #  imgs.append(input_[:,j*block_h:(j+1)*block_h,i*block_w:(i+1)*block_w,:])
     for i in range(w_step):
       fm = []
       for j in range(h_step):
-        img = input_[:,j*block_h:(j+1)*block_h,i*block_w:(i+1)*block_w,:]
-        fm.append(conv2d(img,output_dim,k_h=1,k_w=1,d_h=1,d_w=1,name='pconv_'+str(i)+'_'+str(j)))
+        #img = input_[:,j*block_h:(j+1)*block_h,i*block_w:(i+1)*block_w,:]
+        fm.append(conv2d(tf.slice(input_,[0,j*block_h,i*block_w,0],[size[0],block_h,block_w,size[3]]),output_dim,k_h=1,k_w=1,d_h=1,d_w=1,name='pconv_'+str(i)+'_'+str(j)))
       fms.append(fm)
 
     for i in range(w_step):
