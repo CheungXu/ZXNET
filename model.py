@@ -116,10 +116,10 @@ class DCGAN(object):
     mask_inputs = self.mask_inputs
 
     #按照相应的方法建立网络。
-    self.mask_2, self.mask_4, self.mask_5, self.mask_z = self.encoder(mask_inputs)
-    self.inputs_2, self.inputs_4, self.inputs_5, self.inputs_z = self.encoder(inputs, reuse=True)
+    self.mask_2, self.mask_4, self.mask_z = self.encoder(mask_inputs)
+    self.inputs_2, self.inputs_4, self.inputs_z = self.encoder(inputs, reuse=True)
 
-    self.x_tilde= self.generator(self.mask_2, self.mask_4, self.mask_5, self.mask_z)
+    self.x_tilde= self.generator(self.mask_2, self.mask_4, self.mask_z)
 
 
     self.local_x_tilde = self.x_tilde[:,32:96,18:82,:]
@@ -153,10 +153,9 @@ class DCGAN(object):
 
     #特征损失
     self.z_loss_0 = self.NLLNormal2(self.mask_z, self.inputs_z) / ((self.input_height / 8) * (self.input_width / 8) * 256) 
-    self.z_loss_2 = self.NLLNormal2(self.mask_2, self.inputs_2) / ((self.input_height / 2) * (self.input_width / 2) * 128) 
-    self.z_loss_4 = self.NLLNormal2(self.mask_4, self.inputs_4) / ((self.input_height / 4) * (self.input_width / 4) * 256) 
-    self.z_loss_5 = self.NLLNormal2(self.mask_5, self.inputs_5) / ((self.input_height / 8) * (self.input_width / 8) * 256) 
-    self.z_loss = (self.z_loss_0 + self.z_loss_2 + self.z_loss_4 + self.z_loss_5) / 4
+    self.z_loss_2 = self.NLLNormal2(self.mask_2, self.inputs_2) / ((self.input_height / 2) * (self.input_width / 2) * 64) 
+    self.z_loss_4 = self.NLLNormal2(self.mask_4, self.inputs_4) / ((self.input_height / 4) * (self.input_width / 4) * 128) 
+    self.z_loss = (self.z_loss_0 + self.z_loss_2 + self.z_loss_4) / 4
     self.LL_loss = self.NLLNormal2(self.x_tilde, self.inputs) / ((self.input_height) * (self.input_width) * 3)
     self.local_LL_loss = self.NLLNormal2(self.local_x_tilde, self.local_inputs) / ((self.local_height) * (self.local_width) * 3)
 
@@ -458,20 +457,20 @@ class DCGAN(object):
       h0 = lrelu(batch_normal(conv2d(image, self.df_dim, name='e_h0_conv',k_h=5, k_w=5), scope='e_bn0',reuse=reuse)) #128*128*64
       
       h1 = lrelu(batch_normal(conv2d(h0, self.df_dim*2, name='e_h1_conv', k_h=3, k_w=3, d_h = 2,d_w = 2), scope='e_bn1',reuse=reuse)) #64*64*128
-      h2 = lrelu(batch_normal(conv2d(h1, self.df_dim*2, name='e_h2_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='e_bn2',reuse=reuse)) #64*64*128
+      h2 = lrelu(batch_normal(conv2d(h1, self.df_dim*4, name='e_h2_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='e_bn2',reuse=reuse)) #64*64*128
 
-      h3 = lrelu(batch_normal(conv2d(h2, self.df_dim*4, name='e_h3_conv', k_h=3, k_w=3, d_h = 2,d_w = 2), scope='e_bn3',reuse=reuse)) #32*32*256     
-      h4 = lrelu(batch_normal(conv2d(h3, self.df_dim*4, name='e_h4_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='e_bn4',reuse=reuse)) #32*32*256 
+      h3 = lrelu(batch_normal(conv2d(h2[:,:,:,0:128], self.df_dim*4, name='e_h3_conv', k_h=3, k_w=3, d_h = 2,d_w = 2), scope='e_bn3',reuse=reuse)) #32*32*256     
+      h4 = lrelu(batch_normal(conv2d(h3, self.df_dim*8, name='e_h4_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='e_bn4',reuse=reuse)) #32*32*256 
       
-      h5 = lrelu(batch_normal(conv2d(h4, self.df_dim*4, name='e_h5_conv', k_h=3, k_w=3, d_h = 2,d_w = 2), scope='e_bn5',reuse=reuse)) #16*16*256 
+      h5 = lrelu(batch_normal(conv2d(h4[:,:,:,0:256], self.df_dim*4, name='e_h5_conv', k_h=3, k_w=3, d_h = 2,d_w = 2), scope='e_bn5',reuse=reuse)) #16*16*256 
       h6 = lrelu(batch_normal(dilated_conv(h5, self.df_dim*4, rate=2, name='e_h6_dilconv'), scope='e_bn6',reuse=reuse)) #16*16*256 
       h7 = lrelu(batch_normal(dilated_conv(h6, self.df_dim*4, rate=4, name='e_h7_dilconv'), scope='e_bn7',reuse=reuse)) #16*16*256 
       h8 = lrelu(batch_normal(dilated_conv(h7, self.df_dim*4, rate=8, name='e_h8_dilconv'), scope='e_bn8',reuse=reuse)) #16*16*256 
       h9 = lrelu(batch_normal(dilated_conv(h8, self.df_dim*4, rate=16, name='e_h9_dilconv'), scope='e_bn9',reuse=reuse)) #16*16*256 
       
-      return h2,h4,h5,h9
+      return h2[:,:,:,128:256],h4[:,:,:,256:512],h9
  
-  def generator(self, input_2, input_4, input_5, code, reuse=False):
+  def generator(self, input_2, input_4, code, reuse=False):
     #生成器G，参数z为属于噪声，y为标签。
     with tf.variable_scope("generator") as scope:
       if reuse:
@@ -505,25 +504,35 @@ class DCGAN(object):
       """
       
       h0 = lrelu(batch_normal(conv2d(code, self.df_dim*4, name='g_h0_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='g_bn0',reuse=reuse)) #16*16*256
-      h0_ = lrelu(batch_normal(partition_conv(tf.concat([h0,input_5],3),self.df_dim*4, scope='g_ph0_conv'), scope='g_bn0_', reuse=reuse)) #16*16*256
 
-      h1 = lrelu(batch_normal(conv2d(h0_, self.df_dim*4, name='g_h1_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='g_bn1',reuse=reuse)) #16*16*256
+      h1 = lrelu(batch_normal(conv2d(h0, self.df_dim*4, name='g_h1_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='g_bn1',reuse=reuse)) #16*16*256
       h2 = lrelu(batch_normal(deconv2d(h1, [self.batch_size, s_h4, s_w4, self.gf_dim*4], k_h=3, k_w=3, name='g_h2_deconv'),scope='g_bn2',reuse=reuse)) #32*32*256
 
-      h2_ = lrelu(batch_normal(partition_conv(tf.concat([h2,input_4],3),self.df_dim*4, scope='g_ph2_conv'), scope='g_bn2_', reuse=reuse)) #32*32*256
-      h3 = lrelu(batch_normal(conv2d(h2_, self.df_dim*4, name='g_h3_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='g_bn3',reuse=reuse)) #32*32*256
+      h3 = lrelu(batch_normal(conv2d(h2, self.df_dim*4, name='g_h3_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='g_bn3',reuse=reuse)) #32*32*256
       h4 = lrelu(batch_normal(deconv2d(h3, [self.batch_size, s_h2, s_w2, self.gf_dim*2], k_h=3, k_w=3, name='g_h4_deconv'),scope='g_bn4',reuse=reuse)) #64*64*128
 
-      h4_ = lrelu(batch_normal(partition_conv(tf.concat([h4,input_2],3),self.df_dim*2, scope='g_ph4_conv'), scope='g_bn4_', reuse=reuse)) #64*64*128
-      h5 = lrelu(batch_normal(conv2d(h4_, self.df_dim*2, name='g_h5_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='g_bn5',reuse=reuse)) #64*64*128
+      h5 = lrelu(batch_normal(conv2d(h4, self.df_dim*2, name='g_h5_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='g_bn5',reuse=reuse)) #64*64*128
       h6 = lrelu(batch_normal(deconv2d(h5, [self.batch_size, s_h, s_w, self.gf_dim], k_h=3, k_w=3, name='g_h6_deconv'),scope='g_bn6',reuse=reuse)) #128*128*64
 
-      #h6_ = lrelu(batch_normal(partition_conv(tf.concat([h6,image],3),self.df_dim, scope='g_ph4_conv'), scope='g_bn4_', reuse=reuse)) #64*64*64
-      h7 = lrelu(batch_normal(conv2d(h6, self.df_dim/2, name='g_h7_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='g_bn7',reuse=reuse)) #128*128*32
-      h8 = conv2d(h7, 3, k_h=3, k_w=3, d_h=1, d_w=1, name='g_h8_comv') #128*128*3
 
+
+      hb0 = lrelu(batch_normal(conv2d(input_4, self.df_dim*4, name='g_hb0_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='g_bnb0',reuse=reuse)) #32*32*256
+      hb1 = lrelu(batch_normal(deconv2d(hb0,[self.batch_size, s_h2, s_w2, self.gf_dim*2], k_h=3, k_w=3, name='g_hb1_deconv'),scope='g_bnb1',reuse=reuse)) #32*32*256
+      hb2 = lrelu(batch_normal(conv2d(hb1, self.df_dim*2, name='g_hb2_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='g_bnb2',reuse=reuse)) #32*32*256
+      hb3 = lrelu(batch_normal(deconv2d(hb2,[self.batch_size, s_h, s_w, self.gf_dim], k_h=3, k_w=3, name='g_hb3_deconv'),scope='g_bnb3',reuse=reuse)) #32*32*256 
+
+      hc0 = lrelu(batch_normal(conv2d(input_2, self.df_dim*2, name='g_hc0_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='g_bnc0',reuse=reuse)) #32*32*256
+      hc1 = lrelu(batch_normal(deconv2d(hc0,[self.batch_size, s_h, s_w, self.gf_dim], k_h=3, k_w=3, name='g_hc1_deconv'),scope='g_bnc1',reuse=reuse)) #32*32*256
+      
+      h_conc = tf.concat([h6,hb3,hc1],3)
+      h7 = lrelu(batch_normal(conv2d(h_conc, self.df_dim, name='g_h7_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='g_bn7',reuse=reuse)) #128*128*32
+      h8 = lrelu(batch_normal(conv2d(h7, self.df_dim/2, name='g_h8_conv', k_h=3, k_w=3, d_h = 1,d_w = 1), scope='g_bn8',reuse=reuse)) #128*128*32
+      h9 = conv2d(h8, 3, k_h=3, k_w=3, d_h=1, d_w=1, name='g_h9_comv') #128*128*3
+
+
+      
       #返回tanh激活后的结果。
-      return tf.nn.tanh(h8)
+      return tf.nn.tanh(h9)
 
   def NLLNormal(self, pred, target):
       c = -0.5 * tf.log(2 * np.pi)
