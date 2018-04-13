@@ -34,3 +34,8 @@
          （gan-sr分支: '4.4-paper_net+srgan-v2.1' -> '4.4-paper_net+srgan-v2.2')
 2018.4.7 (1)使用了part-merge层
           (merge-res分支)
+2018.4.11 (1)使用upsample+conv代替了deconv。
+          (2)使用了不带log的损失函数。
+          (3)使用了pixelshuffler。
+          (gan-sr分支：'4.11-ps')
+          
