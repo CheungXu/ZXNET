@@ -38,4 +38,8 @@
           (2)使用了不带log的损失函数。
           (3)使用了pixelshuffler。
           (gan-sr分支：'4.11-ps')
+2018.4.13 (1)使用了LAPGAN类似的生成器结果，同时在判别器中也加入了多尺度信息。
+          (2)使用depth concatation而不是element sum。
+          (LAPGAN分支：'4.11-ps' -> '4.13-concat')
+          
           
